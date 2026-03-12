@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request, session
 import random
+import os
 
 app = Flask(__name__)
 app.secret_key = 'lingo-secret-key-2024'
@@ -10,7 +11,6 @@ COLOR_POINTS = {
 }
 HEIGHT_BONUS = {"high": 50, "mid": 0, "low": 25}
 
-# ─── COMBO DESCRIPTIONS (used by sandbox) ───────────────────────────────────
 COMBO_DESCRIPTIONS = {
     ("white","mid"):  "Basic synonym — find a word that means the same thing",
     ("white","high"): "Phonetic synonym — find a word that sounds the same or similar",
@@ -35,8 +35,6 @@ COMBO_DESCRIPTIONS = {
     ("brown","low"):  "Time + meaning — what follows or precedes this?",
 }
 
-# ─── SANDBOX PUZZLE BANK ────────────────────────────────────────────────────
-# All 21 color+height combos, multiple puzzles each
 SANDBOX_BANK = {
     ("white","mid"): [
         {"clue":"HAPPY",   "answer":"JOY",      "alternates":["GLAD","JOYFUL","ELATED","CHEERFUL"],"hint":"A positive emotion"},
@@ -94,7 +92,7 @@ SANDBOX_BANK = {
         {"clue":"BIG",     "answer":"ENORMOUS",  "alternates":["HUGE","MASSIVE","GIANT"],"hint":"More extreme size"},
         {"clue":"COLD",    "answer":"FREEZING",  "alternates":["FRIGID","ICY"],"hint":"More extreme chill"},
         {"clue":"ANGRY",   "answer":"FURIOUS",   "alternates":["ENRAGED","LIVID"],"hint":"More intense anger"},
-        {"clue":"FAST",    "answer":"LIGHTNING",  "hint":"Superlative speed"},
+        {"clue":"FAST",    "answer":"LIGHTNING", "hint":"Superlative speed"},
         {"clue":"SMART",   "answer":"GENIUS",    "hint":"Extreme intelligence"},
     ],
     ("blue","high"): [
@@ -151,18 +149,18 @@ SANDBOX_BANK = {
         {"clue":"ANAGRAM OF 'STARE'",   "answer":"TEARS",  "hint":"From crying — or rips"},
     ],
     ("yellow","high"): [
-        {"clue":"SOUNDS LIKE A NUMBER + A LETTER: 'ATE'+'ING'", "answer":"EATING", "hint":"Consuming food"},
+        {"clue":"SOUNDS LIKE A NUMBER + A LETTER: 'ATE'+'ING'", "answer":"EATING",  "hint":"Consuming food"},
         {"clue":"SAY 'ICE CREAM' FAST — WHAT DO YOU HEAR?",     "answer":"I SCREAM","hint":"A homophone phrase"},
-        {"clue":"SOUNDS LIKE 'FOR' + 'TY'",                     "answer":"FORTY",  "hint":"The number 40"},
-        {"clue":"WHAT DOES 'CELLAR' SOUND LIKE?",               "answer":"SELLER", "hint":"One who sells"},
-        {"clue":"SOUNDS LIKE 'PROPHET'",                        "answer":"PROFIT", "hint":"Financial gain"},
+        {"clue":"SOUNDS LIKE 'FOR' + 'TY'",                     "answer":"FORTY",   "hint":"The number 40"},
+        {"clue":"WHAT DOES 'CELLAR' SOUND LIKE?",               "answer":"SELLER",  "hint":"One who sells"},
+        {"clue":"SOUNDS LIKE 'PROPHET'",                        "answer":"PROFIT",  "hint":"Financial gain"},
     ],
     ("yellow","low"): [
-        {"clue":"FIRE + WATER",          "answer":"STEAM",  "hint":"What you get when they meet"},
-        {"clue":"DAY + NIGHT TOGETHER",  "answer":"TIME",   "alternates":["CYCLE","DAY"],"hint":"The bigger concept"},
-        {"clue":"SILENCE + MUSIC",       "answer":"PAUSE",  "alternates":["REST","BREAK"],"hint":"A moment between sounds"},
-        {"clue":"COLD + WET",            "answer":"SNOW",   "alternates":["SLEET","ICE","FROST"],"hint":"Winter precipitation"},
-        {"clue":"SWEET + COLD",          "answer":"ICECREAM","alternates":["ICE CREAM","SORBET"],"hint":"A frozen dessert"},
+        {"clue":"FIRE + WATER",          "answer":"STEAM",    "hint":"What you get when they meet"},
+        {"clue":"DAY + NIGHT TOGETHER",  "answer":"TIME",     "alternates":["CYCLE","DAY"],"hint":"The bigger concept"},
+        {"clue":"SILENCE + MUSIC",       "answer":"PAUSE",    "alternates":["REST","BREAK"],"hint":"A moment between sounds"},
+        {"clue":"COLD + WET",            "answer":"SNOW",     "alternates":["SLEET","ICE","FROST"],"hint":"Winter precipitation"},
+        {"clue":"SWEET + COLD",          "answer":"ICECREAM", "alternates":["ICE CREAM","SORBET"],"hint":"A frozen dessert"},
     ],
     ("green","mid"): [
         {"clue":"WHAT YOU SEE WHEN YOU LOOK UP OUTSIDE",  "answer":"SKY",    "hint":"Above you"},
@@ -172,11 +170,11 @@ SANDBOX_BANK = {
         {"clue":"WHAT HOLDS BOOKS IN A LIBRARY",          "answer":"SHELF",  "alternates":["SHELVES"],"hint":"A flat surface on a wall"},
     ],
     ("green","high"): [
-        {"clue":"WHAT A BEE DOES — SOUNDS LIKE 'HYMN'",              "answer":"HUM",    "hint":"Buzzing sound"},
-        {"clue":"WHAT YOU CALL A PATH — SOUNDS LIKE 'ROAD'",         "answer":"RODE",   "hint":"Past tense of ride"},
-        {"clue":"WHAT WIND DOES — RHYMES WITH 'FLOWS'",              "answer":"BLOWS",  "hint":"Air in motion"},
-        {"clue":"WHAT THE SUN DOES — RHYMES WITH 'BITES'",           "answer":"LIGHTS", "hint":"Illuminates"},
-        {"clue":"WHAT WATER DOES DOWNHILL — SOUNDS LIKE 'RUNES'",    "answer":"RUNS",   "hint":"Flows quickly"},
+        {"clue":"WHAT A BEE DOES — SOUNDS LIKE 'HYMN'",           "answer":"HUM",    "hint":"Buzzing sound"},
+        {"clue":"WHAT YOU CALL A PATH — SOUNDS LIKE 'ROAD'",      "answer":"RODE",   "hint":"Past tense of ride"},
+        {"clue":"WHAT WIND DOES — RHYMES WITH 'FLOWS'",           "answer":"BLOWS",  "hint":"Air in motion"},
+        {"clue":"WHAT THE SUN DOES — RHYMES WITH 'BITES'",        "answer":"LIGHTS", "hint":"Illuminates"},
+        {"clue":"WHAT WATER DOES DOWNHILL — SOUNDS LIKE 'RUNES'", "answer":"RUNS",   "hint":"Flows quickly"},
     ],
     ("green","low"): [
         {"clue":"WHAT YOU SIT ON IN A PARK",           "answer":"BENCH",    "hint":"Found along paths"},
@@ -197,23 +195,22 @@ SANDBOX_BANK = {
         {"clue":"JANUARY → ?",    "answer":"FEBRUARY",   "hint":"The next month"},
     ],
     ("brown","high"): [
-        {"clue":"SOUNDS LIKE THE DAY AFTER 'MONDAY'",       "answer":"TUESDAY",   "hint":"Second weekday"},
-        {"clue":"SOUNDS LIKE 'WEAK' BUT MEANS 7 DAYS",      "answer":"WEEK",      "hint":"A unit of time"},
-        {"clue":"SOUNDS LIKE 'MOURNING' BUT IT'S EARLY DAY","answer":"MORNING",   "hint":"Start of the day"},
-        {"clue":"SOUNDS LIKE 'KNEEL' BUT MEANS TO DROP",    "answer":"KNEEL",     "hint":"To go down on one knee"},
-        {"clue":"SOUNDS LIKE 'HOUR' — A UNIT OF TIME",      "answer":"OUR",       "hint":"Belonging to us — sounds like hour"},
+        {"clue":"SOUNDS LIKE THE DAY AFTER 'MONDAY'",        "answer":"TUESDAY", "hint":"Second weekday"},
+        {"clue":"SOUNDS LIKE 'WEAK' BUT MEANS 7 DAYS",       "answer":"WEEK",    "hint":"A unit of time"},
+        {"clue":"SOUNDS LIKE 'MOURNING' BUT IT'S EARLY DAY", "answer":"MORNING", "hint":"Start of the day"},
+        {"clue":"SOUNDS LIKE 'KNEEL' BUT MEANS TO DROP",     "answer":"KNEEL",   "hint":"To go down on one knee"},
+        {"clue":"SOUNDS LIKE 'HOUR' — A UNIT OF TIME",       "answer":"OUR",     "hint":"Belonging to us — sounds like hour"},
     ],
     ("brown","low"): [
-        {"clue":"WHAT COMES AFTER CHILDHOOD",       "answer":"ADULTHOOD",  "alternates":["YOUTH","ADOLESCENCE","TEENS"],"hint":"Growing up"},
-        {"clue":"WHAT A SEED BECOMES",              "answer":"PLANT",      "alternates":["TREE","FLOWER"],"hint":"It grows"},
-        {"clue":"WHAT WINTER BECOMES",              "answer":"SPRING",     "hint":"The warmer season that follows"},
-        {"clue":"WHAT A TADPOLE BECOMES",           "answer":"FROG",       "hint":"An amphibian"},
-        {"clue":"WHAT NIGHT BECOMES",               "answer":"DAY",        "alternates":["DAWN","MORNING"],"hint":"Light returns"},
-        {"clue":"WHAT A CATERPILLAR BECOMES",       "answer":"BUTTERFLY",  "alternates":["MOTH"],"hint":"It flies"},
+        {"clue":"WHAT COMES AFTER CHILDHOOD",   "answer":"ADULTHOOD", "alternates":["YOUTH","ADOLESCENCE","TEENS"],"hint":"Growing up"},
+        {"clue":"WHAT A SEED BECOMES",          "answer":"PLANT",     "alternates":["TREE","FLOWER"],"hint":"It grows"},
+        {"clue":"WHAT WINTER BECOMES",          "answer":"SPRING",    "hint":"The warmer season that follows"},
+        {"clue":"WHAT A TADPOLE BECOMES",       "answer":"FROG",      "hint":"An amphibian"},
+        {"clue":"WHAT NIGHT BECOMES",           "answer":"DAY",       "alternates":["DAWN","MORNING"],"hint":"Light returns"},
+        {"clue":"WHAT A CATERPILLAR BECOMES",   "answer":"BUTTERFLY", "alternates":["MOTH"],"hint":"It flies"},
     ],
 }
 
-# ─── TUTORIAL STAGES ────────────────────────────────────────────────────────
 STAGES = [
     {
         "name": "Stage 1 — The Basics",
@@ -297,12 +294,12 @@ STAGES = [
         "unlocks": {"color": "green", "height": "low"},
         "intro": "Green tiles use CONTEXT — the answer comes from your surroundings or situational knowledge.",
         "puzzles": [
-            {"clue": "WHAT YOU SIT ON IN A PARK",          "answer": "BENCH",   "height": "low", "color": "green", "hint": "Found along pathways"},
-            {"clue": "WHAT BIRDS BUILD IN TREES",          "answer": "NEST",    "height": "low", "color": "green", "hint": "Home for eggs"},
-            {"clue": "WHAT FALLS FROM TREES IN AUTUMN",    "answer": "LEAVES",  "height": "low", "color": "green", "hint": "Seasonal shedding"},
-            {"clue": "WHAT YOU WALK UNDER IN THE RAIN",    "answer": "UMBRELLA","height": "low", "color": "green", "hint": "Keeps you dry"},
-            {"clue": "WHAT A CLOCK DOES EVERY SECOND",     "answer": "TICK",    "height": "low", "color": "green", "hint": "The sound it makes"},
-            {"clue": "WHAT YOU SEE AFTER RAIN IN THE SKY", "answer": "RAINBOW", "height": "low", "color": "green", "hint": "Seven colours"},
+            {"clue": "WHAT YOU SIT ON IN A PARK",          "answer": "BENCH",    "height": "low", "color": "green", "hint": "Found along pathways"},
+            {"clue": "WHAT BIRDS BUILD IN TREES",          "answer": "NEST",     "height": "low", "color": "green", "hint": "Home for eggs"},
+            {"clue": "WHAT FALLS FROM TREES IN AUTUMN",    "answer": "LEAVES",   "height": "low", "color": "green", "hint": "Seasonal shedding"},
+            {"clue": "WHAT YOU WALK UNDER IN THE RAIN",    "answer": "UMBRELLA", "height": "low", "color": "green", "hint": "Keeps you dry"},
+            {"clue": "WHAT A CLOCK DOES EVERY SECOND",     "answer": "TICK",     "height": "low", "color": "green", "hint": "The sound it makes"},
+            {"clue": "WHAT YOU SEE AFTER RAIN IN THE SKY", "answer": "RAINBOW",  "height": "low", "color": "green", "hint": "Seven colours"},
         ],
     },
     {
@@ -385,8 +382,6 @@ def build_ordered_puzzles():
 ALL_PUZZLES = build_ordered_puzzles()
 TOTAL_STAGES = len(STAGES)
 
-# ─── ROUTES — PAGES ─────────────────────────────────────────────────────────
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -394,8 +389,6 @@ def index():
 @app.route('/sandbox')
 def sandbox():
     return render_template('sandbox.html')
-
-# ─── ROUTES — TUTORIAL API ──────────────────────────────────────────────────
 
 @app.route('/api/new_game', methods=['POST'])
 def new_game():
@@ -470,11 +463,8 @@ def get_hint():
         return jsonify({"hint": ALL_PUZZLES[current].get('hint', 'No hint available.')})
     return jsonify({"hint": "No hint available."})
 
-# ─── ROUTES — SANDBOX API ───────────────────────────────────────────────────
-
 @app.route('/api/sandbox/combos', methods=['GET'])
 def sandbox_combos():
-    """Return all available combos and how many puzzles each has."""
     combos = {}
     for (color, height), puzzles in SANDBOX_BANK.items():
         combos[f"{color}_{height}"] = {
@@ -487,7 +477,6 @@ def sandbox_combos():
 
 @app.route('/api/sandbox/puzzle', methods=['POST'])
 def sandbox_puzzle():
-    """Return a random puzzle for the requested color+height combo."""
     data = request.get_json()
     color = data.get('color', '').lower()
     height = data.get('height', '').lower()
@@ -510,7 +499,6 @@ def sandbox_puzzle():
 
 @app.route('/api/sandbox/submit', methods=['POST'])
 def sandbox_submit():
-    """Check a sandbox answer."""
     data = request.get_json()
     answer = data.get('answer', '').strip().upper()
     correct_answer = data.get('correct_answer', '').upper()
@@ -541,4 +529,5 @@ def _safe_puzzle(puzzle, index):
     }
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
