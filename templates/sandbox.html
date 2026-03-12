@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LINGO — Sandbox</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0e12; --surface: #16181f; --surface2: #1e2029; --border: #2a2d38;
+    --text: #e8eaf0; --muted: #6b7080;
+    --white: #d4cfc8; --red: #e84855; --blue: #3a86ff; --black-tile: #4a4d5e;
+    --yellow: #ffd166; --green: #06d6a0; --brown: #b07d62;
+    --high-accent: #a78bfa; --mid-accent: #60a5fa; --low-accent: #34d399;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', sans-serif; min-height: 100vh;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: relative; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 2rem; border-bottom: 1px solid var(--border);
+    background: rgba(13,14,18,0.8); backdrop-filter: blur(12px);
+    position: sticky; top: 0;
+  }
+  .nav-logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.12em; background: linear-gradient(135deg, #e8eaf0, #6b7080); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .nav-logo span { -webkit-text-fill-color: var(--yellow); }
+  .nav-links { display: flex; gap: 0.5rem; }
+  .nav-link {
+    padding: 0.45rem 1rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;
+    transition: background 0.2s, color 0.2s;
+    color: var(--muted); border: 1px solid transparent;
+  }
+  .nav-link:hover { color: var(--text); background: var(--surface2); }
+  .nav-link.active { color: var(--yellow); border-color: rgba(255,209,102,0.3); background: rgba(255,209,102,0.08); }
+  .nav-score { font-family: 'DM Mono', monospace; font-size: 1rem; color: var(--yellow); }
+  .nav-score span { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: block; text-align: right; }
+
+  /* ── LAYOUT ── */
+  .page { position: relative; z-index: 1; display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 57px); }
+
+  /* ── LEFT PANEL — TILE GRID ── */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1.25rem;
+    overflow-y: auto;
+  }
+  .panel-title { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.25rem; }
+
+  /* Height axis labels */
+  .grid-wrap { position: relative; }
+  .height-labels { display: flex; flex-direction: column; gap: 0; margin-bottom: 0.5rem; }
+  .height-label {
+    font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600;
+    padding: 0 0 0.3rem 0; display: flex; align-items: center; gap: 0.4rem;
+  }
+  .height-label[data-h="high"] { color: var(--high-accent); }
+  .height-label[data-h="mid"]  { color: var(--mid-accent); }
+  .height-label[data-h="low"]  { color: var(--low-accent); }
+
+  /* 7-col color header */
+  .color-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; padding-left: 0; }
+  .color-header-cell { font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase; text-align: center; padding-bottom: 4px; }
+
+  /* The 3×7 tile grid */
+  .tile-matrix { display: grid; grid-template-rows: repeat(3, 1fr); gap: 4px; }
+  .tile-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+
+  .tile-btn {
+    aspect-ratio: 1; border-radius: 8px; border: 1.5px solid transparent;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; position: relative; overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    background: var(--surface2);
+  }
+  .tile-btn:hover { transform: translateY(-2px) scale(1.05); }
+  .tile-btn.selected { border-color: #fff !important; box-shadow: 0 0 0 2px rgba(255,255,255,0.3); transform: scale(1.08); }
+  .tile-btn[data-color="white"]  { border-color: rgba(212,207,200,0.25); }
+  .tile-btn[data-color="red"]    { border-color: rgba(232,72,85,0.3); }
+  .tile-btn[data-color="blue"]   { border-color: rgba(58,134,255,0.3); }
+  .tile-btn[data-color="black"]  { border-color: rgba(74,77,94,0.5); }
+  .tile-btn[data-color="yellow"] { border-color: rgba(255,209,102,0.3); }
+  .tile-btn[data-color="green"]  { border-color: rgba(6,214,160,0.3); }
+  .tile-btn[data-color="brown"]  { border-color: rgba(176,125,98,0.3); }
+
+  /* Color fills */
+  .tile-btn[data-color="white"]  { background: rgba(212,207,200,0.08); }
+  .tile-btn[data-color="red"]    { background: rgba(232,72,85,0.1); }
+  .tile-btn[data-color="blue"]   { background: rgba(58,134,255,0.1); }
+  .tile-btn[data-color="black"]  { background: rgba(42,45,56,0.6); }
+  .tile-btn[data-color="yellow"] { background: rgba(255,209,102,0.1); }
+  .tile-btn[data-color="green"]  { background: rgba(6,214,160,0.1); }
+  .tile-btn[data-color="brown"]  { background: rgba(176,125,98,0.1); }
+
+  /* Height indicator strip on tile */
+  .tile-btn::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 3px;
+  }
+  .tile-btn[data-height="high"]::after { top: 0; background: var(--high-accent); }
+  .tile-btn[data-height="mid"]::after  { top: 50%; transform: translateY(-50%); background: var(--mid-accent); opacity: 0.5; }
+  .tile-btn[data-height="low"]::after  { bottom: 0; background: var(--low-accent); }
+
+  /* Selected combo info */
+  .combo-info {
+    margin-top: 1.25rem; padding: 1rem; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px;
+    font-size: 0.8rem; color: var(--muted); line-height: 1.5;
+    min-height: 70px;
+    transition: border-color 0.3s;
+  }
+  .combo-info.has-selection { color: var(--text); }
+  .combo-info-title { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+  .combo-badges { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+  .badge { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.25rem 0.6rem; border-radius: 99px; border: 1px solid currentColor; }
+  .badge[data-c="white"]  { color: var(--white);  background: rgba(212,207,200,0.1); }
+  .badge[data-c="red"]    { color: var(--red);    background: rgba(232,72,85,0.1); }
+  .badge[data-c="blue"]   { color: var(--blue);   background: rgba(58,134,255,0.1); }
+  .badge[data-c="black"]  { color: var(--black-tile); background: rgba(74,77,94,0.2); }
+  .badge[data-c="yellow"] { color: var(--yellow); background: rgba(255,209,102,0.1); }
+  .badge[data-c="green"]  { color: var(--green);  background: rgba(6,214,160,0.1); }
+  .badge[data-c="brown"]  { color: var(--brown);  background: rgba(176,125,98,0.1); }
+  .badge[data-h="high"] { color: var(--high-accent); background: rgba(167,139,250,0.1); }
+  .badge[data-h="mid"]  { color: var(--mid-accent);  background: rgba(96,165,250,0.1); }
+  .badge[data-h="low"]  { color: var(--low-accent);  background: rgba(52,211,153,0.1); }
+
+  .btn-load {
+    margin-top: 1rem; width: 100%;
+    padding: 0.8rem; border-radius: 10px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    background: linear-gradient(135deg, var(--blue), #2563eb);
+    color: #fff; box-shadow: 0 4px 14px rgba(58,134,255,0.25);
+    transition: transform 0.15s, opacity 0.15s;
+    display: none;
+  }
+  .btn-load:hover { transform: translateY(-1px); }
+  .btn-load:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-load.visible { display: block; }
+
+  /* ── RIGHT PANEL — PUZZLE AREA ── */
+  .right-panel { padding: 2rem 2.5rem; display: flex; flex-direction: column; }
+
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: var(--muted); gap: 1rem;
+  }
+  .empty-icon { font-size: 4rem; opacity: 0.3; }
+  .empty-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.1em; color: var(--border); }
+  .empty-sub { font-size: 0.85rem; max-width: 260px; line-height: 1.6; }
+
+  .puzzle-area { display: none; flex-direction: column; gap: 1.5rem; }
+  .puzzle-area.active { display: flex; }
+
+  /* Session stats */
+  .session-stats {
+    display: flex; gap: 1.5rem;
+    padding: 1rem 1.25rem; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .stat { text-align: center; }
+  .stat-val { font-family: 'DM Mono', monospace; font-size: 1.4rem; color: var(--yellow); line-height: 1; }
+  .stat-val.green { color: var(--green); }
+  .stat-val.red { color: var(--red); }
+  .stat-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+  .stat-divider { width: 1px; background: var(--border); }
+
+  /* Puzzle card */
+  .puzzle-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 2rem; position: relative; overflow: hidden;
+    animation: cardIn 0.35s cubic-bezier(0.34,1.2,0.64,1);
+  }
+  @keyframes cardIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  .puzzle-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .puzzle-card[data-color="white"]::before  { background: var(--white); }
+  .puzzle-card[data-color="red"]::before    { background: var(--red); }
+  .puzzle-card[data-color="blue"]::before   { background: var(--blue); }
+  .puzzle-card[data-color="black"]::before  { background: var(--black-tile); }
+  .puzzle-card[data-color="yellow"]::before { background: var(--yellow); }
+  .puzzle-card[data-color="green"]::before  { background: var(--green); }
+  .puzzle-card[data-color="brown"]::before  { background: var(--brown); }
+
+  .card-badges { display: flex; gap: 0.6rem; margin-bottom: 1.2rem; }
+  .clue-type { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+  .clue-text { font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem; letter-spacing: 0.08em; line-height: 1.1; color: var(--text); margin-bottom: 1rem; }
+  .answer-length-hint { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); margin-bottom: 1.5rem; letter-spacing: 0.1em; }
+  .answer-length-hint span { display: inline-block; width: 0.8em; text-align: center; }
+
+  .input-row { display: flex; gap: 0.75rem; }
+  .answer-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.85rem 1rem; font-family: 'DM Mono', monospace; font-size: 1rem;
+    letter-spacing: 0.08em; color: var(--text); outline: none; text-transform: uppercase;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .answer-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(58,134,255,0.15); }
+  .answer-input::placeholder { color: var(--muted); text-transform: none; }
+
+  .btn {
+    padding: 0.85rem 1.5rem; border-radius: 10px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; transition: transform 0.15s, opacity 0.15s;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-submit { background: linear-gradient(135deg, #3a86ff, #2563eb); color: #fff; box-shadow: 0 4px 14px rgba(58,134,255,0.25); }
+  .btn-hint-sm { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; }
+  .btn-hint-sm:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+  .btn-next { background: linear-gradient(135deg, var(--green), #059669); color: #0d0e12; font-weight: 700; display: none; }
+  .btn-next.show { display: inline-block; }
+
+  .feedback {
+    margin-top: 1rem; padding: 0.9rem 1.1rem; border-radius: 10px;
+    font-size: 0.88rem; font-weight: 600; display: none; animation: feedIn 0.3s ease;
+  }
+  @keyframes feedIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .feedback.correct { background: rgba(6,214,160,0.12); border: 1px solid rgba(6,214,160,0.4); color: var(--green); }
+  .feedback.wrong   { background: rgba(232,72,85,0.1);  border: 1px solid rgba(232,72,85,0.35); color: var(--red); }
+  .feedback.hint-fb { background: rgba(255,209,102,0.1); border: 1px solid rgba(255,209,102,0.3); color: var(--yellow); }
+
+  /* Streak bar */
+  .streak-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .streak-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--border); transition: background 0.3s; }
+  .streak-dot.correct { background: var(--green); }
+  .streak-dot.wrong   { background: var(--red); }
+
+  .shake { animation: shake 0.4s ease; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">LIN<span>G</span>O</a>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Tutorial</a>
+    <a href="/sandbox" class="nav-link active">Sandbox</a>
+  </div>
+  <div class="nav-score">
+    <span>Session Score</span>
+    <span id="nav-score">0</span>
+  </div>
+</nav>
+
+<div class="page">
+  <!-- LEFT: TILE SELECTOR -->
+  <div class="left-panel">
+    <div class="panel-title">Pick a Tile Combo</div>
+
+    <!-- Color column headers -->
+    <div class="color-header" id="color-header"></div>
+
+    <!-- 3 rows × 7 cols grid -->
+    <div class="tile-matrix" id="tile-matrix"></div>
+
+    <!-- Selected combo info -->
+    <div class="combo-info" id="combo-info">
+      <span style="font-size:0.8rem;">Click any tile to select a color + height combination, then load a puzzle.</span>
+    </div>
+
+    <button class="btn btn-load" id="btn-load" onclick="loadSandboxPuzzle()">Load Puzzle →</button>
+  </div>
+
+  <!-- RIGHT: PUZZLE AREA -->
+  <div class="right-panel">
+
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🎲</div>
+      <div class="empty-title">Choose a Combo</div>
+      <div class="empty-sub">Select any tile on the left to explore all 21 color × height combinations.</div>
+    </div>
+
+    <div class="puzzle-area" id="puzzle-area">
+
+      <div class="session-stats">
+        <div class="stat"><div class="stat-val" id="stat-score">0</div><div class="stat-label">Score</div></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><div class="stat-val green" id="stat-correct">0</div><div class="stat-label">Correct</div></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><div class="stat-val red" id="stat-wrong">0</div><div class="stat-label">Wrong</div></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><div class="stat-val" id="stat-streak" style="color:var(--yellow)">0</div><div class="stat-label">Streak</div></div>
+      </div>
+
+      <div class="streak-row" id="streak-row"></div>
+
+      <div class="puzzle-card" id="puzzle-card" data-color="white">
+        <div class="card-badges" id="card-badges"></div>
+        <div class="clue-type" id="clue-type">Clue</div>
+        <div class="clue-text" id="clue-text">—</div>
+        <div class="answer-length-hint" id="ans-len"></div>
+        <div class="input-row">
+          <input type="text" class="answer-input" id="answer-input" placeholder="Type your answer…" autocomplete="off" spellcheck="false"/>
+          <button class="btn btn-submit" id="btn-submit" onclick="submitAnswer()">Submit</button>
+          <button class="btn btn-hint-sm" id="btn-hint" onclick="showHint()">Hint</button>
+          <button class="btn btn-next" id="btn-next" onclick="loadSandboxPuzzle()">Next →</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS  = ['white','red','blue','black','yellow','green','brown'];
+const HEIGHTS = ['high','mid','low'];
+const COLOR_EMOJI  = {white:'⬜',red:'🔴',blue:'🔵',black:'⬛',yellow:'🟡',green:'🟢',brown:'🟫'};
+const COLOR_LABELS = {white:'White',red:'Red',blue:'Blue',black:'Black',yellow:'Yellow',green:'Green',brown:'Brown'};
+const HEIGHT_LABELS= {high:'High – Sound',mid:'Mid – Spelling',low:'Low – Meaning'};
+const CLUE_TYPES   = {high:'🔊 Phonetic Clue',mid:'🔤 Spelling Clue',low:'💡 Meaning / Context Clue'};
+
+let comboData = {};
+let selected = null; // {color, height}
+let currentPuzzle = null;
+let session = { score:0, correct:0, wrong:0, streak:0, history:[] };
+
+// ── BUILD GRID ──
+async function buildGrid() {
+  const res = await fetch('/api/sandbox/combos');
+  comboData = await res.json();
+
+  // Color headers
+  const hdr = document.getElementById('color-header');
+  COLORS.forEach(c => {
+    const cell = document.createElement('div');
+    cell.className = 'color-header-cell';
+    cell.style.color = `var(--${c === 'black' ? 'black-tile' : c})`;
+    cell.textContent = COLOR_EMOJI[c];
+    hdr.appendChild(cell);
+  });
+
+  // Tile buttons
+  const matrix = document.getElementById('tile-matrix');
+  HEIGHTS.forEach(h => {
+    const row = document.createElement('div');
+    row.className = 'tile-row';
+    COLORS.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'tile-btn';
+      btn.setAttribute('data-color', c);
+      btn.setAttribute('data-height', h);
+      btn.setAttribute('title', `${COLOR_LABELS[c]} / ${HEIGHT_LABELS[h]}`);
+      btn.textContent = COLOR_EMOJI[c];
+      btn.onclick = () => selectCombo(c, h, btn);
+      row.appendChild(btn);
+    });
+    matrix.appendChild(row);
+  });
+}
+
+function selectCombo(color, height, btn) {
+  // Deselect all
+  document.querySelectorAll('.tile-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selected = { color, height };
+
+  const key = `${color}_${height}`;
+  const info = comboData[key] || {};
+
+  const ci = document.getElementById('combo-info');
+  ci.className = 'combo-info has-selection';
+  ci.innerHTML = `
+    <div class="combo-info-title">Selected Combination</div>
+    <div class="combo-badges">
+      <span class="badge" data-c="${color}">${COLOR_EMOJI[color]} ${COLOR_LABELS[color]}</span>
+      <span class="badge" data-h="${height}">${HEIGHT_LABELS[height]}</span>
+    </div>
+    <div style="font-size:0.8rem;color:var(--muted);line-height:1.5;">${info.description || ''}</div>
+    <div style="font-size:0.65rem;color:var(--border);margin-top:0.5rem;letter-spacing:0.08em;">${info.count || 0} PUZZLES AVAILABLE</div>
+  `;
+
+  const loadBtn = document.getElementById('btn-load');
+  loadBtn.classList.add('visible');
+}
+
+async function loadSandboxPuzzle() {
+  if (!selected) return;
+  const loadBtn = document.getElementById('btn-load');
+  loadBtn.disabled = true;
+
+  const res = await fetch('/api/sandbox/puzzle', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(selected)
+  });
+  const p = await res.json();
+  if (p.error) { loadBtn.disabled = false; return; }
+
+  currentPuzzle = p;
+
+  // Show puzzle area
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('puzzle-area').classList.add('active');
+
+  const card = document.getElementById('puzzle-card');
+  card.setAttribute('data-color', p.color);
+  // Re-trigger animation
+  card.style.animation = 'none';
+  requestAnimationFrame(() => { card.style.animation = ''; });
+
+  // Badges
+  document.getElementById('card-badges').innerHTML = `
+    <span class="badge" data-c="${p.color}">${COLOR_EMOJI[p.color]} ${COLOR_LABELS[p.color]}</span>
+    <span class="badge" data-h="${p.height}">${HEIGHT_LABELS[p.height]}</span>
+  `;
+
+  document.getElementById('clue-type').textContent = CLUE_TYPES[p.height] || 'Clue';
+  document.getElementById('clue-text').textContent = p.clue;
+  document.getElementById('ans-len').innerHTML = 'Answer: ' + Array(p.answer_length).fill('<span>_</span>').join(' ');
+
+  const inp = document.getElementById('answer-input');
+  inp.value = ''; inp.disabled = false; inp.focus();
+
+  document.getElementById('btn-submit').disabled = false;
+  document.getElementById('btn-hint').disabled = false;
+  document.getElementById('btn-next').classList.remove('show');
+
+  const fb = document.getElementById('feedback');
+  fb.style.display = 'none'; fb.className = 'feedback';
+
+  loadBtn.disabled = false;
+}
+
+async function submitAnswer() {
+  const inp = document.getElementById('answer-input');
+  const answer = inp.value.trim();
+  if (!answer || !currentPuzzle) {
+    inp.classList.add('shake'); setTimeout(() => inp.classList.remove('shake'), 400); return;
+  }
+
+  inp.disabled = true;
+  document.getElementById('btn-submit').disabled = true;
+  document.getElementById('btn-hint').disabled = true;
+
+  const res = await fetch('/api/sandbox/submit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      answer,
+      correct_answer: currentPuzzle._answer,
+      alternates: currentPuzzle._alternates || [],
+      color: currentPuzzle.color,
+      height: currentPuzzle.height,
+    })
+  });
+  const data = await res.json();
+
+  if (data.correct) {
+    session.score += data.points_earned;
+    session.correct++;
+    session.streak++;
+    session.history.push('correct');
+  } else {
+    session.wrong++;
+    session.streak = 0;
+    session.history.push('wrong');
+  }
+  updateStats();
+
+  const fb = document.getElementById('feedback');
+  if (data.correct) {
+    fb.className = 'feedback correct';
+    fb.textContent = `✓ Correct! +${data.points_earned} points`;
+  } else {
+    fb.className = 'feedback wrong';
+    fb.textContent = `✗ The answer was "${data.correct_answer}"`;
+  }
+  fb.style.display = 'block';
+  document.getElementById('btn-next').classList.add('show');
+}
+
+function showHint() {
+  document.getElementById('btn-hint').disabled = true;
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback hint-fb';
+  fb.textContent = `💡 ${currentPuzzle.hint || 'No hint available.'}`;
+  fb.style.display = 'block';
+}
+
+function updateStats() {
+  document.getElementById('stat-score').textContent   = session.score;
+  document.getElementById('stat-correct').textContent = session.correct;
+  document.getElementById('stat-wrong').textContent   = session.wrong;
+  document.getElementById('stat-streak').textContent  = session.streak;
+  document.getElementById('nav-score').textContent    = session.score;
+
+  // Streak dots (last 20)
+  const row = document.getElementById('streak-row');
+  const last = session.history.slice(-20);
+  row.innerHTML = last.map(r => `<div class="streak-dot ${r}"></div>`).join('');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const nextBtn = document.getElementById('btn-next');
+    if (nextBtn.classList.contains('show')) loadSandboxPuzzle();
+    else submitAnswer();
+  }
+});
+
+buildGrid();
+</script>
+</body>
+</html>
