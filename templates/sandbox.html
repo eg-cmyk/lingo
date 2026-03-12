@@ -257,20 +257,23 @@
 <div class="page">
   <!-- LEFT: TILE SELECTOR -->
   <div class="left-panel">
-    <div class="panel-title">Pick a Tile Combo</div>
+    <div class="panel-title">Pick Tiles</div>
+    <div style="font-size:0.72rem;color:var(--muted);margin-bottom:1rem;line-height:1.5;">Pick <strong style="color:var(--text)">1 tile</strong> for a standard puzzle, or <strong style="color:var(--yellow)">2 tiles</strong> for a harder multi-tile combo. Then pick a height.</div>
 
-    <!-- Color column headers -->
-    <div class="color-header" id="color-header"></div>
+    <!-- Color selector — click to toggle, up to 2 -->
+    <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem;">Color <span id="color-count-label" style="color:var(--yellow);"></span></div>
+    <div id="color-picker" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.25rem;"></div>
 
-    <!-- 3 rows × 7 cols grid -->
-    <div class="tile-matrix" id="tile-matrix"></div>
+    <!-- Height selector -->
+    <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem;">Height</div>
+    <div id="height-picker" style="display:flex;gap:0.4rem;margin-bottom:1.25rem;"></div>
 
-    <!-- Selected combo info -->
+    <!-- Combo info -->
     <div class="combo-info" id="combo-info">
-      <span style="font-size:0.8rem;">Click any tile to select a color + height combination, then load a puzzle.</span>
+      <span style="font-size:0.8rem;color:var(--muted);">Select tiles above, then load a puzzle.</span>
     </div>
 
-    <button class="btn btn-load" id="btn-load" onclick="loadSandboxPuzzle()">Load Puzzle →</button>
+    <button class="btn btn-load" id="btn-load" onclick="loadPuzzleFromSelection()" style="display:none;margin-top:1rem;width:100%;">Load Puzzle →</button>
   </div>
 
   <!-- RIGHT: PUZZLE AREA -->
@@ -322,162 +325,193 @@ const COLOR_LABELS = {white:'White',red:'Red',blue:'Blue',black:'Black',yellow:'
 const HEIGHT_LABELS= {high:'High – Sound',mid:'Mid – Spelling',low:'Low – Meaning'};
 const CLUE_TYPES   = {high:'🔊 Phonetic Clue',mid:'🔤 Spelling Clue',low:'💡 Meaning / Context Clue'};
 
-let comboData = {};
-let selected = null; // {color, height}
-let currentPuzzle = null;
+let singleCombos = {};
+let multiCombos  = {};
+let selectedColors = []; // up to 2
+let selectedHeight = null;
+let currentPuzzle  = null;
 let session = { score:0, correct:0, wrong:0, streak:0, history:[] };
+let submitted = false;
 
-// ── BUILD GRID ──
-async function buildGrid() {
-  const res = await fetch('/api/sandbox/combos');
-  comboData = await res.json();
+// ── BUILD SELECTORS ──
+async function init() {
+  const [sr, mr] = await Promise.all([
+    fetch('/api/sandbox/combos'),
+    fetch('/api/sandbox/multi_combos'),
+  ]);
+  singleCombos = await sr.json();
+  multiCombos  = await mr.json();
 
-  // Color headers
-  const hdr = document.getElementById('color-header');
+  // Color picker
+  const cp = document.getElementById('color-picker');
   COLORS.forEach(c => {
-    const cell = document.createElement('div');
-    cell.className = 'color-header-cell';
-    cell.style.color = `var(--${c === 'black' ? 'black-tile' : c})`;
-    cell.textContent = COLOR_EMOJI[c];
-    hdr.appendChild(cell);
+    const btn = document.createElement('button');
+    btn.id = `cp-${c}`;
+    btn.style.cssText = `padding:0.45rem 0.8rem;border-radius:8px;border:2px solid var(--border);background:var(--surface2);cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.15s;color:var(--muted);`;
+    btn.textContent = COLOR_EMOJI[c] + ' ' + COLOR_LABELS[c];
+    btn.title = COLOR_LABELS[c];
+    btn.onclick = () => toggleColor(c);
+    cp.appendChild(btn);
   });
 
-  // Tile buttons
-  const matrix = document.getElementById('tile-matrix');
+  // Height picker
+  const hp = document.getElementById('height-picker');
   HEIGHTS.forEach(h => {
-    const row = document.createElement('div');
-    row.className = 'tile-row';
-    COLORS.forEach(c => {
-      const btn = document.createElement('button');
-      btn.className = 'tile-btn';
-      btn.setAttribute('data-color', c);
-      btn.setAttribute('data-height', h);
-      btn.setAttribute('title', `${COLOR_LABELS[c]} / ${HEIGHT_LABELS[h]}`);
-      btn.textContent = COLOR_EMOJI[c];
-      btn.onclick = () => selectCombo(c, h, btn);
-      row.appendChild(btn);
-    });
-    matrix.appendChild(row);
+    const btn = document.createElement('button');
+    btn.id = `hp-${h}`;
+    btn.style.cssText = `flex:1;padding:0.5rem;border-radius:8px;border:2px solid var(--border);background:var(--surface2);cursor:pointer;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;transition:all 0.15s;color:var(--muted);`;
+    btn.textContent = h.charAt(0).toUpperCase()+h.slice(1);
+    btn.onclick = () => selectHeight(h);
+    hp.appendChild(btn);
   });
 }
 
-function selectCombo(color, height, btn) {
-  // Deselect all
-  document.querySelectorAll('.tile-btn').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-  selected = { color, height };
+function toggleColor(color) {
+  if (selectedColors.includes(color)) {
+    selectedColors = selectedColors.filter(c => c !== color);
+  } else if (selectedColors.length < 2) {
+    selectedColors.push(color);
+  } else {
+    // replace last selection
+    selectedColors[1] = color;
+  }
+  // Update button styles
+  COLORS.forEach(c => {
+    const btn = document.getElementById(`cp-${c}`);
+    if (!btn) return;
+    const active = selectedColors.includes(c);
+    const idx = selectedColors.indexOf(c);
+    btn.style.borderColor = active ? 'var(--yellow)' : 'var(--border)';
+    btn.style.color = active ? 'var(--text)' : 'var(--muted)';
+    btn.style.background = active ? 'rgba(255,209,102,0.1)' : 'var(--surface2)';
+    // Show order badge
+    btn.textContent = COLOR_EMOJI[c] + ' ' + COLOR_LABELS[c] + (active && selectedColors.length === 2 ? ` (${idx+1})` : '');
+  });
+  const label = document.getElementById('color-count-label');
+  label.textContent = selectedColors.length > 0 ? `(${selectedColors.length} selected)` : '';
+  updateComboInfo();
+}
 
-  const key = `${color}_${height}`;
-  const info = comboData[key] || {};
+function selectHeight(h) {
+  selectedHeight = h;
+  HEIGHTS.forEach(hh => {
+    const btn = document.getElementById(`hp-${hh}`);
+    if (!btn) return;
+    btn.style.borderColor = hh === h ? 'var(--yellow)' : 'var(--border)';
+    btn.style.color = hh === h ? 'var(--yellow)' : 'var(--muted)';
+    btn.style.background = hh === h ? 'rgba(255,209,102,0.1)' : 'var(--surface2)';
+  });
+  updateComboInfo();
+}
 
-  const ci = document.getElementById('combo-info');
-  ci.className = 'combo-info has-selection';
-  ci.innerHTML = `
-    <div class="combo-info-title">Selected Combination</div>
-    <div class="combo-badges">
-      <span class="badge" data-c="${color}">${COLOR_EMOJI[color]} ${COLOR_LABELS[color]}</span>
-      <span class="badge" data-h="${height}">${HEIGHT_LABELS[height]}</span>
+function updateComboInfo() {
+  const info = document.getElementById('combo-info');
+  const btn  = document.getElementById('btn-load');
+  if (!selectedColors.length || !selectedHeight) {
+    info.innerHTML = '<span style="font-size:0.8rem;color:var(--muted);">Select tiles above, then load a puzzle.</span>';
+    btn.style.display = 'none'; return;
+  }
+  const isMulti = selectedColors.length === 2;
+  let desc = '', count = 0, valid = false;
+  if (isMulti) {
+    const key = `${selectedColors[0]}_${selectedColors[1]}_${selectedHeight}`;
+    const combo = multiCombos[key];
+    if (combo) { desc = combo.description; count = combo.count; valid = true; }
+    else { info.innerHTML = `<span style="font-size:0.78rem;color:var(--red);">No puzzles for ${COLOR_EMOJI[selectedColors[0]]}+${COLOR_EMOJI[selectedColors[1]]} at ${selectedHeight} height yet.</span>`; btn.style.display = 'none'; return; }
+  } else {
+    const key = `${selectedColors[0]}_${selectedHeight}`;
+    const combo = singleCombos[key];
+    if (combo) { desc = combo.description; count = combo.count; valid = true; }
+    else { info.innerHTML = `<span style="font-size:0.78rem;color:var(--red);">No puzzles for this combo.</span>`; btn.style.display = 'none'; return; }
+  }
+  const badges = selectedColors.map(c => `<span class="badge" data-c="${c}">${COLOR_EMOJI[c]} ${COLOR_LABELS[c]}</span>`).join('<span style="color:var(--muted);margin:0 0.25rem">+</span>');
+  info.innerHTML = `
+    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;margin-bottom:0.5rem;">
+      ${badges}
+      <span style="color:var(--muted)">·</span>
+      <span class="badge" data-h="${selectedHeight}">${HEIGHT_LABELS[selectedHeight]}</span>
+      ${isMulti ? '<span style="font-size:0.65rem;color:var(--yellow);background:rgba(255,209,102,0.1);padding:0.2rem 0.5rem;border-radius:99px;border:1px solid rgba(255,209,102,0.3)">MULTI</span>' : ''}
     </div>
-    <div style="font-size:0.8rem;color:var(--muted);line-height:1.5;">${info.description || ''}</div>
-    <div style="font-size:0.65rem;color:var(--border);margin-top:0.5rem;letter-spacing:0.08em;">${info.count || 0} PUZZLES AVAILABLE</div>
-  `;
-
-  const loadBtn = document.getElementById('btn-load');
-  loadBtn.classList.add('visible');
+    <div style="font-size:0.78rem;color:var(--muted);">${desc}</div>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:0.25rem;">${count} puzzle${count!==1?'s':''} available</div>`;
+  btn.style.display = 'block';
 }
 
-async function loadSandboxPuzzle() {
-  if (!selected) return;
-  const loadBtn = document.getElementById('btn-load');
-  loadBtn.disabled = true;
+async function loadPuzzleFromSelection() {
+  const isMulti = selectedColors.length === 2;
+  let data, url, body;
+  if (isMulti) {
+    url = '/api/sandbox/multi_puzzle';
+    body = { color1: selectedColors[0], color2: selectedColors[1], height: selectedHeight };
+  } else {
+    url = '/api/sandbox/puzzle';
+    body = { color: selectedColors[0], height: selectedHeight };
+  }
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (!res.ok) { alert('No puzzles for this combo yet!'); return; }
+  data = await res.json();
+  data._isMulti = isMulti;
+  currentPuzzle = data;
+  submitted = false;
 
-  const res = await fetch('/api/sandbox/puzzle', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(selected)
-  });
-  const p = await res.json();
-  if (p.error) { loadBtn.disabled = false; return; }
-
-  currentPuzzle = p;
-
-  // Show puzzle area
   document.getElementById('empty-state').style.display = 'none';
-  document.getElementById('puzzle-area').classList.add('active');
-
-  const card = document.getElementById('puzzle-card');
-  card.setAttribute('data-color', p.color);
-  // Re-trigger animation
-  card.style.animation = 'none';
-  requestAnimationFrame(() => { card.style.animation = ''; });
+  document.getElementById('puzzle-area').style.display = 'block';
+  document.getElementById('puzzle-card').setAttribute('data-color', selectedColors[0]);
 
   // Badges
-  document.getElementById('card-badges').innerHTML = `
-    <span class="badge" data-c="${p.color}">${COLOR_EMOJI[p.color]} ${COLOR_LABELS[p.color]}</span>
-    <span class="badge" data-h="${p.height}">${HEIGHT_LABELS[p.height]}</span>
-  `;
+  const badges = selectedColors.map(c =>
+    `<span class="badge" data-c="${c}">${COLOR_EMOJI[c]} ${COLOR_LABELS[c]}</span>`
+  ).join('<span style="color:var(--muted);font-size:0.85rem;margin:0 0.2rem">+</span>') +
+  `<span style="color:var(--muted);margin:0 0.2rem">·</span><span class="badge" data-h="${selectedHeight}">${HEIGHT_LABELS[selectedHeight]}</span>` +
+  (isMulti ? `<span style="font-size:0.6rem;color:var(--yellow);background:rgba(255,209,102,0.1);padding:0.15rem 0.45rem;border-radius:99px;border:1px solid rgba(255,209,102,0.3);margin-left:0.2rem">MULTI</span>` : '');
+  document.getElementById('card-badges').innerHTML = badges;
 
-  document.getElementById('clue-type').textContent = CLUE_TYPES[p.height] || 'Clue';
-  document.getElementById('clue-text').textContent = p.clue;
-  document.getElementById('ans-len').innerHTML = 'Answer: ' + Array(p.answer_length).fill('<span>_</span>').join(' ');
+  document.getElementById('clue-type').textContent = isMulti ? '🃏 Multi-Tile Clue' : CLUE_TYPES[selectedHeight];
+  document.getElementById('clue-text').textContent = data.clue;
+  document.getElementById('ans-len').innerHTML = 'Answer: ' + Array(data.answer_length).fill('<span>_</span>').join(' ');
 
   const inp = document.getElementById('answer-input');
-  inp.value = ''; inp.disabled = false; inp.focus();
-
+  inp.value=''; inp.disabled=false; inp.focus();
   document.getElementById('btn-submit').disabled = false;
-  document.getElementById('btn-hint').disabled = false;
+  document.getElementById('btn-hint').disabled   = false;
+  document.getElementById('feedback').style.display = 'none';
+  document.getElementById('feedback').className = 'feedback';
+  // reset Next button to reload same combo
   document.getElementById('btn-next').classList.remove('show');
-
-  const fb = document.getElementById('feedback');
-  fb.style.display = 'none'; fb.className = 'feedback';
-
-  loadBtn.disabled = false;
+  document.getElementById('btn-next').onclick = loadPuzzleFromSelection;
 }
 
 async function submitAnswer() {
+  if (submitted || !currentPuzzle) return;
   const inp = document.getElementById('answer-input');
   const answer = inp.value.trim();
-  if (!answer || !currentPuzzle) {
-    inp.classList.add('shake'); setTimeout(() => inp.classList.remove('shake'), 400); return;
-  }
-
+  if (!answer) { inp.classList.add('shake'); setTimeout(()=>inp.classList.remove('shake'),400); return; }
+  submitted = true;
   inp.disabled = true;
   document.getElementById('btn-submit').disabled = true;
   document.getElementById('btn-hint').disabled = true;
 
-  const res = await fetch('/api/sandbox/submit', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      answer,
-      correct_answer: currentPuzzle._answer,
-      alternates: currentPuzzle._alternates || [],
-      color: currentPuzzle.color,
-      height: currentPuzzle.height,
-    })
-  });
-  const data = await res.json();
-
-  if (data.correct) {
-    session.score += data.points_earned;
-    session.correct++;
-    session.streak++;
-    session.history.push('correct');
+  let res, data;
+  if (currentPuzzle._isMulti) {
+    res = await fetch('/api/sandbox/multi_submit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ answer, correct_answer: currentPuzzle._answer, alternates: currentPuzzle._alternates||[], color1: currentPuzzle.color1, color2: currentPuzzle.color2, height: currentPuzzle.height })
+    });
   } else {
-    session.wrong++;
-    session.streak = 0;
-    session.history.push('wrong');
+    res = await fetch('/api/sandbox/submit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ answer, correct_answer: currentPuzzle._answer, alternates: currentPuzzle._alternates||[], color: currentPuzzle.color, height: currentPuzzle.height })
+    });
   }
+  data = await res.json();
+
+  if (data.correct) { session.score+=data.points_earned; session.correct++; session.streak++; session.history.push('correct'); }
+  else { session.wrong++; session.streak=0; session.history.push('wrong'); }
   updateStats();
 
   const fb = document.getElementById('feedback');
-  if (data.correct) {
-    fb.className = 'feedback correct';
-    fb.textContent = `✓ Correct! +${data.points_earned} points`;
-  } else {
-    fb.className = 'feedback wrong';
-    fb.textContent = `✗ The answer was "${data.correct_answer}"`;
-  }
+  fb.className = 'feedback ' + (data.correct ? 'correct' : 'wrong');
+  fb.textContent = data.correct ? `✓ Correct! +${data.points_earned} points` : `✗ The answer was "${data.correct_answer}"`;
   fb.style.display = 'block';
   document.getElementById('btn-next').classList.add('show');
 }
@@ -496,22 +530,19 @@ function updateStats() {
   document.getElementById('stat-wrong').textContent   = session.wrong;
   document.getElementById('stat-streak').textContent  = session.streak;
   document.getElementById('nav-score').textContent    = session.score;
-
-  // Streak dots (last 20)
   const row = document.getElementById('streak-row');
-  const last = session.history.slice(-20);
-  row.innerHTML = last.map(r => `<div class="streak-dot ${r}"></div>`).join('');
+  row.innerHTML = session.history.slice(-20).map(r => `<div class="streak-dot ${r}"></div>`).join('');
 }
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const nextBtn = document.getElementById('btn-next');
-    if (nextBtn.classList.contains('show')) loadSandboxPuzzle();
+    if (nextBtn.classList.contains('show')) loadPuzzleFromSelection();
     else submitAnswer();
   }
 });
 
-buildGrid();
+init();
 </script>
 </body>
 </html>

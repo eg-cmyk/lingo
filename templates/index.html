@@ -339,7 +339,7 @@ const COLOR_EMOJI = { white:'⬜', red:'🔴', blue:'🔵', black:'⬛', yellow:
 const COLOR_LABELS = { white:'White', red:'Red – Subtract', blue:'Blue – Add', black:'Black – Opposite', yellow:'Yellow – Mixed', green:'Green – Context', brown:'Brown – Time' };
 const HEIGHT_LABELS = { high:'High – Sound', mid:'Mid – Spelling', low:'Low – Meaning' };
 const CLUE_TYPE_DESC = { high:'🔊 Phonetic / Sound Clue', mid:'🔤 Spelling Clue', low:'💡 Meaning / Context Clue' };
-const STAGE_SIZES = [5,6,6,6,6,6,6,6,5,5,5,5]; // puzzles per stage
+const STAGE_SIZES = [5,6,6,6,6,6,6,6,5,5,5,5,5,5,5,5,5,5]; // puzzles per stage
 
 function buildStageTrack(total) {
   const track = document.getElementById('stage-track');
@@ -372,18 +372,33 @@ function loadPuzzle(puzzle, index) {
   const stageIdx = puzzle.stage_index;
   const stagePuzzlesCompleted = index - STAGE_SIZES.slice(0, stageIdx).reduce((a,b)=>a+b,0);
   const stageTotal = STAGE_SIZES[stageIdx] || 5;
+  const colors = puzzle.colors || [puzzle.color];
+  const isMulti = puzzle.is_multi || colors.length > 1;
 
-  document.getElementById('puzzle-card').setAttribute('data-color', puzzle.color);
+  const card = document.getElementById('puzzle-card');
+  card.setAttribute('data-color', colors[0]);
 
-  const bh = document.getElementById('badge-height');
-  bh.setAttribute('data-h', puzzle.height);
-  bh.textContent = puzzle.height.toUpperCase();
+  // Build badges — support multi-tile (two color badges + plus sign)
+  const badgeContainer = document.getElementById('badge-container');
+  if (badgeContainer) {
+    if (isMulti) {
+      badgeContainer.innerHTML = colors.map((c,i) =>
+        `${i>0?'<span class="badge-plus">+</span>':''}<span class="badge badge-color" data-c="${c}" style="border:1px solid currentColor">${COLOR_LABELS[c]||c}</span>`
+      ).join('') + `<span class="badge badge-height" data-h="${puzzle.height}" style="border:1px solid currentColor">${HEIGHT_LABELS[puzzle.height]||puzzle.height}</span>`;
+    } else {
+      const bh = document.getElementById('badge-height');
+      if (bh) { bh.setAttribute('data-h', puzzle.height); bh.textContent = puzzle.height.toUpperCase(); }
+      const bc = document.getElementById('badge-color');
+      if (bc) { bc.setAttribute('data-c', puzzle.color); bc.textContent = COLOR_LABELS[puzzle.color] || puzzle.color; }
+    }
+  } else {
+    const bh = document.getElementById('badge-height');
+    if (bh) { bh.setAttribute('data-h', puzzle.height); bh.textContent = puzzle.height.toUpperCase(); }
+    const bc = document.getElementById('badge-color');
+    if (bc) { bc.setAttribute('data-c', isMulti ? colors[1] : puzzle.color); bc.textContent = isMulti ? (COLOR_LABELS[colors[0]]+'  +  '+COLOR_LABELS[colors[1]]) : (COLOR_LABELS[puzzle.color] || puzzle.color); }
+  }
 
-  const bc = document.getElementById('badge-color');
-  bc.setAttribute('data-c', puzzle.color);
-  bc.textContent = COLOR_LABELS[puzzle.color] || puzzle.color;
-
-  document.getElementById('clue-type').textContent = CLUE_TYPE_DESC[puzzle.height] || 'Clue';
+  document.getElementById('clue-type').textContent = isMulti ? '🃏 Multi-Tile Clue' : (CLUE_TYPE_DESC[puzzle.height] || 'Clue');
   document.getElementById('clue-text').textContent = puzzle.clue;
   document.getElementById('ans-len').innerHTML = `Answer: ${renderLengthHint(puzzle.answer_length)}`;
   document.getElementById('puzzle-label').textContent = `Puzzle ${stagePuzzlesCompleted + 1} of ${stageTotal}`;
@@ -404,17 +419,26 @@ function loadPuzzle(puzzle, index) {
 
 function showUnlock(unlock) {
   const card = document.getElementById('unlock-card');
-  card.setAttribute('data-color', unlock.color);
-  document.getElementById('unlock-emoji').textContent = COLOR_EMOJI[unlock.color] || '🆕';
-  document.getElementById('unlock-title').textContent = 'New Tile Unlocked!';
+  const colors = unlock.colors || [unlock.color];
+  card.setAttribute('data-color', colors[0]);
+
+  const isMulti = colors.length > 1;
+  const emoji = colors.map(c => ({white:'⬜',red:'🔴',blue:'🔵',black:'⬛',yellow:'🟡',green:'🟢',brown:'🟫'}[c]||'🆕')).join('');
+  document.getElementById('unlock-emoji').textContent = emoji;
+  document.getElementById('unlock-title').textContent = isMulti ? 'Multi-Tile Combo Unlocked!' : 'New Tile Unlocked!';
   document.getElementById('unlock-stage-name').textContent = unlock.stage_name;
   document.getElementById('unlock-intro').textContent = unlock.intro;
 
   const badges = document.getElementById('unlock-badges');
-  badges.innerHTML = `
-    <span class="badge badge-color" data-c="${unlock.color}" style="border:1px solid currentColor">${COLOR_LABELS[unlock.color]||unlock.color}</span>
-    <span class="badge badge-height" data-h="${unlock.height}" style="border:1px solid currentColor">${HEIGHT_LABELS[unlock.height]||unlock.height}</span>
-  `;
+  if (isMulti) {
+    badges.innerHTML = colors.map((c,i) =>
+      `${i>0?'<span class="badge-plus" style="color:var(--muted)">+</span>':''}<span class="badge badge-color" data-c="${c}" style="border:1px solid currentColor">${COLOR_LABELS[c]||c}</span>`
+    ).join('') + `<span class="badge badge-height" data-h="${unlock.height}" style="border:1px solid currentColor">${HEIGHT_LABELS[unlock.height]||unlock.height}</span>`;
+  } else {
+    badges.innerHTML = `
+      <span class="badge badge-color" data-c="${colors[0]}" style="border:1px solid currentColor">${COLOR_LABELS[colors[0]]||colors[0]}</span>
+      <span class="badge badge-height" data-h="${unlock.height}" style="border:1px solid currentColor">${HEIGHT_LABELS[unlock.height]||unlock.height}</span>`;
+  }
   document.getElementById('stage-unlock').classList.add('show');
 }
 

@@ -1,6 +1,5 @@
 from flask import Flask, render_template, jsonify, request, session
 import random
-import os
 
 app = Flask(__name__)
 app.secret_key = 'lingo-secret-key-2024'
@@ -11,6 +10,7 @@ COLOR_POINTS = {
 }
 HEIGHT_BONUS = {"high": 50, "mid": 0, "low": 25}
 
+# ─── COMBO DESCRIPTIONS (used by sandbox) ───────────────────────────────────
 COMBO_DESCRIPTIONS = {
     ("white","mid"):  "Basic synonym — find a word that means the same thing",
     ("white","high"): "Phonetic synonym — find a word that sounds the same or similar",
@@ -35,6 +35,8 @@ COMBO_DESCRIPTIONS = {
     ("brown","low"):  "Time + meaning — what follows or precedes this?",
 }
 
+# ─── SANDBOX PUZZLE BANK ────────────────────────────────────────────────────
+# All 21 color+height combos, multiple puzzles each
 SANDBOX_BANK = {
     ("white","mid"): [
         {"clue":"HAPPY",   "answer":"JOY",      "alternates":["GLAD","JOYFUL","ELATED","CHEERFUL"],"hint":"A positive emotion"},
@@ -92,7 +94,7 @@ SANDBOX_BANK = {
         {"clue":"BIG",     "answer":"ENORMOUS",  "alternates":["HUGE","MASSIVE","GIANT"],"hint":"More extreme size"},
         {"clue":"COLD",    "answer":"FREEZING",  "alternates":["FRIGID","ICY"],"hint":"More extreme chill"},
         {"clue":"ANGRY",   "answer":"FURIOUS",   "alternates":["ENRAGED","LIVID"],"hint":"More intense anger"},
-        {"clue":"FAST",    "answer":"LIGHTNING", "hint":"Superlative speed"},
+        {"clue":"FAST",    "answer":"LIGHTNING",  "hint":"Superlative speed"},
         {"clue":"SMART",   "answer":"GENIUS",    "hint":"Extreme intelligence"},
     ],
     ("blue","high"): [
@@ -149,18 +151,18 @@ SANDBOX_BANK = {
         {"clue":"ANAGRAM OF 'STARE'",   "answer":"TEARS",  "hint":"From crying — or rips"},
     ],
     ("yellow","high"): [
-        {"clue":"SOUNDS LIKE A NUMBER + A LETTER: 'ATE'+'ING'", "answer":"EATING",  "hint":"Consuming food"},
+        {"clue":"SOUNDS LIKE A NUMBER + A LETTER: 'ATE'+'ING'", "answer":"EATING", "hint":"Consuming food"},
         {"clue":"SAY 'ICE CREAM' FAST — WHAT DO YOU HEAR?",     "answer":"I SCREAM","hint":"A homophone phrase"},
-        {"clue":"SOUNDS LIKE 'FOR' + 'TY'",                     "answer":"FORTY",   "hint":"The number 40"},
-        {"clue":"WHAT DOES 'CELLAR' SOUND LIKE?",               "answer":"SELLER",  "hint":"One who sells"},
-        {"clue":"SOUNDS LIKE 'PROPHET'",                        "answer":"PROFIT",  "hint":"Financial gain"},
+        {"clue":"SOUNDS LIKE 'FOR' + 'TY'",                     "answer":"FORTY",  "hint":"The number 40"},
+        {"clue":"WHAT DOES 'CELLAR' SOUND LIKE?",               "answer":"SELLER", "hint":"One who sells"},
+        {"clue":"SOUNDS LIKE 'PROPHET'",                        "answer":"PROFIT", "hint":"Financial gain"},
     ],
     ("yellow","low"): [
-        {"clue":"FIRE + WATER",          "answer":"STEAM",    "hint":"What you get when they meet"},
-        {"clue":"DAY + NIGHT TOGETHER",  "answer":"TIME",     "alternates":["CYCLE","DAY"],"hint":"The bigger concept"},
-        {"clue":"SILENCE + MUSIC",       "answer":"PAUSE",    "alternates":["REST","BREAK"],"hint":"A moment between sounds"},
-        {"clue":"COLD + WET",            "answer":"SNOW",     "alternates":["SLEET","ICE","FROST"],"hint":"Winter precipitation"},
-        {"clue":"SWEET + COLD",          "answer":"ICECREAM", "alternates":["ICE CREAM","SORBET"],"hint":"A frozen dessert"},
+        {"clue":"FIRE + WATER",          "answer":"STEAM",  "hint":"What you get when they meet"},
+        {"clue":"DAY + NIGHT TOGETHER",  "answer":"TIME",   "alternates":["CYCLE","DAY"],"hint":"The bigger concept"},
+        {"clue":"SILENCE + MUSIC",       "answer":"PAUSE",  "alternates":["REST","BREAK"],"hint":"A moment between sounds"},
+        {"clue":"COLD + WET",            "answer":"SNOW",   "alternates":["SLEET","ICE","FROST"],"hint":"Winter precipitation"},
+        {"clue":"SWEET + COLD",          "answer":"ICECREAM","alternates":["ICE CREAM","SORBET"],"hint":"A frozen dessert"},
     ],
     ("green","mid"): [
         {"clue":"WHAT YOU SEE WHEN YOU LOOK UP OUTSIDE",  "answer":"SKY",    "hint":"Above you"},
@@ -170,11 +172,11 @@ SANDBOX_BANK = {
         {"clue":"WHAT HOLDS BOOKS IN A LIBRARY",          "answer":"SHELF",  "alternates":["SHELVES"],"hint":"A flat surface on a wall"},
     ],
     ("green","high"): [
-        {"clue":"WHAT A BEE DOES — SOUNDS LIKE 'HYMN'",           "answer":"HUM",    "hint":"Buzzing sound"},
-        {"clue":"WHAT YOU CALL A PATH — SOUNDS LIKE 'ROAD'",      "answer":"RODE",   "hint":"Past tense of ride"},
-        {"clue":"WHAT WIND DOES — RHYMES WITH 'FLOWS'",           "answer":"BLOWS",  "hint":"Air in motion"},
-        {"clue":"WHAT THE SUN DOES — RHYMES WITH 'BITES'",        "answer":"LIGHTS", "hint":"Illuminates"},
-        {"clue":"WHAT WATER DOES DOWNHILL — SOUNDS LIKE 'RUNES'", "answer":"RUNS",   "hint":"Flows quickly"},
+        {"clue":"WHAT A BEE DOES — SOUNDS LIKE 'HYMN'",              "answer":"HUM",    "hint":"Buzzing sound"},
+        {"clue":"WHAT YOU CALL A PATH — SOUNDS LIKE 'ROAD'",         "answer":"RODE",   "hint":"Past tense of ride"},
+        {"clue":"WHAT WIND DOES — RHYMES WITH 'FLOWS'",              "answer":"BLOWS",  "hint":"Air in motion"},
+        {"clue":"WHAT THE SUN DOES — RHYMES WITH 'BITES'",           "answer":"LIGHTS", "hint":"Illuminates"},
+        {"clue":"WHAT WATER DOES DOWNHILL — SOUNDS LIKE 'RUNES'",    "answer":"RUNS",   "hint":"Flows quickly"},
     ],
     ("green","low"): [
         {"clue":"WHAT YOU SIT ON IN A PARK",           "answer":"BENCH",    "hint":"Found along paths"},
@@ -195,22 +197,23 @@ SANDBOX_BANK = {
         {"clue":"JANUARY → ?",    "answer":"FEBRUARY",   "hint":"The next month"},
     ],
     ("brown","high"): [
-        {"clue":"SOUNDS LIKE THE DAY AFTER 'MONDAY'",        "answer":"TUESDAY", "hint":"Second weekday"},
-        {"clue":"SOUNDS LIKE 'WEAK' BUT MEANS 7 DAYS",       "answer":"WEEK",    "hint":"A unit of time"},
-        {"clue":"SOUNDS LIKE 'MOURNING' BUT IT'S EARLY DAY", "answer":"MORNING", "hint":"Start of the day"},
-        {"clue":"SOUNDS LIKE 'KNEEL' BUT MEANS TO DROP",     "answer":"KNEEL",   "hint":"To go down on one knee"},
-        {"clue":"SOUNDS LIKE 'HOUR' — A UNIT OF TIME",       "answer":"OUR",     "hint":"Belonging to us — sounds like hour"},
+        {"clue":"SOUNDS LIKE THE DAY AFTER 'MONDAY'",       "answer":"TUESDAY",   "hint":"Second weekday"},
+        {"clue":"SOUNDS LIKE 'WEAK' BUT MEANS 7 DAYS",      "answer":"WEEK",      "hint":"A unit of time"},
+        {"clue":"SOUNDS LIKE 'MOURNING' BUT IT'S EARLY DAY","answer":"MORNING",   "hint":"Start of the day"},
+        {"clue":"SOUNDS LIKE 'KNEEL' BUT MEANS TO DROP",    "answer":"KNEEL",     "hint":"To go down on one knee"},
+        {"clue":"SOUNDS LIKE 'HOUR' — A UNIT OF TIME",      "answer":"OUR",       "hint":"Belonging to us — sounds like hour"},
     ],
     ("brown","low"): [
-        {"clue":"WHAT COMES AFTER CHILDHOOD",   "answer":"ADULTHOOD", "alternates":["YOUTH","ADOLESCENCE","TEENS"],"hint":"Growing up"},
-        {"clue":"WHAT A SEED BECOMES",          "answer":"PLANT",     "alternates":["TREE","FLOWER"],"hint":"It grows"},
-        {"clue":"WHAT WINTER BECOMES",          "answer":"SPRING",    "hint":"The warmer season that follows"},
-        {"clue":"WHAT A TADPOLE BECOMES",       "answer":"FROG",      "hint":"An amphibian"},
-        {"clue":"WHAT NIGHT BECOMES",           "answer":"DAY",       "alternates":["DAWN","MORNING"],"hint":"Light returns"},
-        {"clue":"WHAT A CATERPILLAR BECOMES",   "answer":"BUTTERFLY", "alternates":["MOTH"],"hint":"It flies"},
+        {"clue":"WHAT COMES AFTER CHILDHOOD",       "answer":"ADULTHOOD",  "alternates":["YOUTH","ADOLESCENCE","TEENS"],"hint":"Growing up"},
+        {"clue":"WHAT A SEED BECOMES",              "answer":"PLANT",      "alternates":["TREE","FLOWER"],"hint":"It grows"},
+        {"clue":"WHAT WINTER BECOMES",              "answer":"SPRING",     "hint":"The warmer season that follows"},
+        {"clue":"WHAT A TADPOLE BECOMES",           "answer":"FROG",       "hint":"An amphibian"},
+        {"clue":"WHAT NIGHT BECOMES",               "answer":"DAY",        "alternates":["DAWN","MORNING"],"hint":"Light returns"},
+        {"clue":"WHAT A CATERPILLAR BECOMES",       "answer":"BUTTERFLY",  "alternates":["MOTH"],"hint":"It flies"},
     ],
 }
 
+# ─── TUTORIAL STAGES ────────────────────────────────────────────────────────
 STAGES = [
     {
         "name": "Stage 1 — The Basics",
@@ -294,12 +297,12 @@ STAGES = [
         "unlocks": {"color": "green", "height": "low"},
         "intro": "Green tiles use CONTEXT — the answer comes from your surroundings or situational knowledge.",
         "puzzles": [
-            {"clue": "WHAT YOU SIT ON IN A PARK",          "answer": "BENCH",    "height": "low", "color": "green", "hint": "Found along pathways"},
-            {"clue": "WHAT BIRDS BUILD IN TREES",          "answer": "NEST",     "height": "low", "color": "green", "hint": "Home for eggs"},
-            {"clue": "WHAT FALLS FROM TREES IN AUTUMN",    "answer": "LEAVES",   "height": "low", "color": "green", "hint": "Seasonal shedding"},
-            {"clue": "WHAT YOU WALK UNDER IN THE RAIN",    "answer": "UMBRELLA", "height": "low", "color": "green", "hint": "Keeps you dry"},
-            {"clue": "WHAT A CLOCK DOES EVERY SECOND",     "answer": "TICK",     "height": "low", "color": "green", "hint": "The sound it makes"},
-            {"clue": "WHAT YOU SEE AFTER RAIN IN THE SKY", "answer": "RAINBOW",  "height": "low", "color": "green", "hint": "Seven colours"},
+            {"clue": "WHAT YOU SIT ON IN A PARK",          "answer": "BENCH",   "height": "low", "color": "green", "hint": "Found along pathways"},
+            {"clue": "WHAT BIRDS BUILD IN TREES",          "answer": "NEST",    "height": "low", "color": "green", "hint": "Home for eggs"},
+            {"clue": "WHAT FALLS FROM TREES IN AUTUMN",    "answer": "LEAVES",  "height": "low", "color": "green", "hint": "Seasonal shedding"},
+            {"clue": "WHAT YOU WALK UNDER IN THE RAIN",    "answer": "UMBRELLA","height": "low", "color": "green", "hint": "Keeps you dry"},
+            {"clue": "WHAT A CLOCK DOES EVERY SECOND",     "answer": "TICK",    "height": "low", "color": "green", "hint": "The sound it makes"},
+            {"clue": "WHAT YOU SEE AFTER RAIN IN THE SKY", "answer": "RAINBOW", "height": "low", "color": "green", "hint": "Seven colours"},
         ],
     },
     {
@@ -368,19 +371,29 @@ STAGES = [
 def build_ordered_puzzles():
     ordered = []
     for stage_idx, stage in enumerate(STAGES):
+        unlock = stage['unlocks']
+        # Normalize: single-tile stages use 'color', multi use 'colors'
+        normalized_unlock = {
+            "colors": unlock.get('colors', [unlock['color']]),
+            "height": unlock['height'],
+        }
         for puzz_idx, p in enumerate(stage['puzzles']):
             ordered.append({
                 **p,
+                "colors": [p['color']],
+                "is_multi": False,
                 "stage_index": stage_idx,
                 "stage_name": stage['name'],
                 "is_first_in_stage": puzz_idx == 0,
-                "unlocks": stage['unlocks'] if puzz_idx == 0 else None,
+                "unlocks": normalized_unlock if puzz_idx == 0 else None,
                 "stage_intro": stage['intro'] if puzz_idx == 0 else None,
             })
     return ordered
 
-ALL_PUZZLES = build_ordered_puzzles()
-TOTAL_STAGES = len(STAGES)
+ALL_PUZZLES = build_ordered_puzzles()  # will be extended after build_multi_puzzles is defined below
+TOTAL_STAGES = 18  # 12 single-tile + 6 multi-tile stages
+
+# ─── ROUTES — PAGES ─────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -390,20 +403,23 @@ def index():
 def sandbox():
     return render_template('sandbox.html')
 
+# ─── ROUTES — TUTORIAL API ──────────────────────────────────────────────────
+
 @app.route('/api/new_game', methods=['POST'])
 def new_game():
     session['current'] = 0
     session['score'] = 0
     session['results'] = []
     first = ALL_PUZZLES[0]
+    unlock = first['unlocks']
     return jsonify({
         "total": len(ALL_PUZZLES),
         "total_stages": TOTAL_STAGES,
         "puzzle": _safe_puzzle(first, 0),
         "score": 0,
         "stage_unlock": {
-            "color": first['unlocks']['color'],
-            "height": first['unlocks']['height'],
+            "colors": unlock.get('colors', [unlock.get('color', first['color'])]),
+            "height": unlock.get('height', first['height']),
             "stage_name": first['stage_name'],
             "intro": first['stage_intro'],
         }
@@ -448,9 +464,10 @@ def submit():
         response["puzzle_number"] = next_index + 1
         response["total"] = len(ALL_PUZZLES)
         if next_p['is_first_in_stage']:
+            unlock = next_p['unlocks']
             response["stage_unlock"] = {
-                "color": next_p['unlocks']['color'],
-                "height": next_p['unlocks']['height'],
+                "colors": unlock.get('colors', [unlock.get('color', next_p['color'])]),
+                "height": unlock.get('height', next_p['height']),
                 "stage_name": next_p['stage_name'],
                 "intro": next_p['stage_intro'],
             }
@@ -463,8 +480,11 @@ def get_hint():
         return jsonify({"hint": ALL_PUZZLES[current].get('hint', 'No hint available.')})
     return jsonify({"hint": "No hint available."})
 
+# ─── ROUTES — SANDBOX API ───────────────────────────────────────────────────
+
 @app.route('/api/sandbox/combos', methods=['GET'])
 def sandbox_combos():
+    """Return all available combos and how many puzzles each has."""
     combos = {}
     for (color, height), puzzles in SANDBOX_BANK.items():
         combos[f"{color}_{height}"] = {
@@ -477,6 +497,7 @@ def sandbox_combos():
 
 @app.route('/api/sandbox/puzzle', methods=['POST'])
 def sandbox_puzzle():
+    """Return a random puzzle for the requested color+height combo."""
     data = request.get_json()
     color = data.get('color', '').lower()
     height = data.get('height', '').lower()
@@ -499,6 +520,7 @@ def sandbox_puzzle():
 
 @app.route('/api/sandbox/submit', methods=['POST'])
 def sandbox_submit():
+    """Check a sandbox answer."""
     data = request.get_json()
     answer = data.get('answer', '').strip().upper()
     correct_answer = data.get('correct_answer', '').upper()
@@ -516,18 +538,372 @@ def sandbox_submit():
         "points_earned": points_earned,
     })
 
+# ─── MULTI-TILE PUZZLE BANK ─────────────────────────────────────────────────
+# Each puzzle has TWO colors + one height. Both rules must be applied together.
+# color2 is the second tile. Points = both colors + height bonus.
+
+MULTI_BANK = {
+    # RED + BLACK = subtract to find the opposite
+    ("red","black","mid"): [
+        {"clue":"ANCIENT",    "answer":"MODERN",  "hint":"First find the opposite, then simplify it — contemporary works too", "alternates":["CONTEMPORARY","NEW","RECENT"]},
+        {"clue":"ENORMOUS",   "answer":"TINY",    "hint":"Subtract the scale AND flip it", "alternates":["SMALL","LITTLE","MINI"]},
+        {"clue":"BLAZING",    "answer":"COOL",    "hint":"Less intense AND the opposite temperature", "alternates":["COLD","CHILLY"]},
+        {"clue":"VICTORY",    "answer":"LOSS",    "hint":"Reduce the outcome AND flip it", "alternates":["DEFEAT","FAIL"]},
+        {"clue":"THUNDERSTORM","answer":"CALM",   "hint":"Reduce the weather AND find its opposite", "alternates":["STILL","QUIET","PEACE"]},
+    ],
+    # BLUE + BLACK = amplify to find the opposite
+    ("blue","black","mid"): [
+        {"clue":"WARM",       "answer":"FREEZING","hint":"Amplify AND flip the temperature", "alternates":["FROZEN","ICY","FRIGID"]},
+        {"clue":"DISLIKE",    "answer":"ADORE",   "hint":"Find the opposite AND intensify it", "alternates":["LOVE","WORSHIP"]},
+        {"clue":"WHISPER",    "answer":"ROAR",    "hint":"Amplify AND flip the sound", "alternates":["SCREAM","SHOUT","BELLOW"]},
+        {"clue":"DRIZZLE",    "answer":"BLIZZARD","hint":"Add intensity AND flip the warmth"},
+        {"clue":"JOY",        "answer":"AGONY",   "hint":"Amplify AND reverse the emotion", "alternates":["MISERY","DESPAIR","GRIEF"]},
+    ],
+    # RED + BROWN = subtract to find what came before
+    ("red","brown","mid"): [
+        {"clue":"SUMMER",     "answer":"SPRING",  "hint":"Go back one season AND reduce the warmth"},
+        {"clue":"ADULTHOOD",  "answer":"BIRTH",   "hint":"Go back to the very beginning", "alternates":["INFANCY","BABY"]},
+        {"clue":"MILLENNIUM", "answer":"DECADE",  "hint":"Go back in time AND reduce the scale"},
+        {"clue":"EVENING",    "answer":"DAWN",    "hint":"Earlier in the day AND a simpler word", "alternates":["MORNING","SUNRISE"]},
+        {"clue":"RIVER",      "answer":"SPRING",  "hint":"Reduce the water AND go to its source", "alternates":["SOURCE","CREEK"]},
+    ],
+    # BLUE + BROWN = amplify AND move forward in time
+    ("blue","brown","mid"): [
+        {"clue":"MORNING",    "answer":"TOMORROW","hint":"Later in time AND expand beyond today"},
+        {"clue":"SEED",       "answer":"FOREST",  "hint":"Grow it AND let time pass", "alternates":["TREE","WOODLAND"]},
+        {"clue":"CHILD",      "answer":"ELDER",   "hint":"Age forward AND amplify", "alternates":["ADULT","SENIOR","OLD"]},
+        {"clue":"SPARK",      "answer":"INFERNO", "hint":"Let time and fuel amplify the fire", "alternates":["FIRE","BLAZE"]},
+        {"clue":"CREEK",      "answer":"OCEAN",   "hint":"Amplify the water AND let it flow over time"},
+    ],
+    # RED + YELLOW = subtract with a twist / anagram of a lesser form
+    ("red","yellow","mid"): [
+        {"clue":"ANAGRAM OF 'SPARE' → LESSER FORM", "answer":"REAP",   "hint":"Unscramble then reduce — harvesting less", "alternates":["REAPS"]},
+        {"clue":"ANAGRAM OF 'NIGHT' → SIMPLER",     "answer":"THIN",   "hint":"Rearrange, then strip it down", "alternates":["HINT"]},
+        {"clue":"ANAGRAM OF 'EARTH' → LESSER ORGAN","answer":"EAR",    "hint":"Unscramble heart, then find a smaller part"},
+        {"clue":"ANAGRAM OF 'STARE' → LESS WATER",  "answer":"TEAR",   "hint":"Rearrange tears, then reduce to one drop", "alternates":["TEARS"]},
+        {"clue":"ANAGRAM OF 'BELOW' → SIMPLER JOINT","answer":"ELBOW", "hint":"Unscramble, then it's already the answer"},
+    ],
+    # BLUE + YELLOW = amplify with a twist / anagram of a greater form
+    ("blue","yellow","mid"): [
+        {"clue":"ANAGRAM OF 'LEMON' → BIGGER FRUIT", "answer":"MELON",  "hint":"Rearrange to find the larger fruit"},
+        {"clue":"ANAGRAM OF 'EARTH' → BIGGER ORGAN", "answer":"HEART",  "hint":"Rearrange to the organ that powers everything"},
+        {"clue":"ANAGRAM OF 'DUSTY' → BIGGER EFFORT","answer":"STUDY",  "hint":"Rearrange to a greater mental exercise"},
+        {"clue":"ANAGRAM OF 'LISTEN' → AMPLIFIED",   "answer":"ENLIST", "hint":"Rearrange listen — a bigger commitment", "alternates":["SILENT","TINSEL"]},
+        {"clue":"ANAGRAM OF 'BELOW' → AMPLIFIED",    "answer":"ELBOW",  "hint":"Rearrange to the joint that lets you reach further"},
+    ],
+    # BLACK + BROWN = opposite + time shift
+    ("black","brown","mid"): [
+        {"clue":"WINTER",     "answer":"AUTUMN",  "hint":"Go back one season AND find its warmer opposite", "alternates":["FALL"]},
+        {"clue":"ENEMY",      "answer":"ALLY",    "hint":"Flip it AND think of who stood with you in the past", "alternates":["FRIEND","COMPANION"]},
+        {"clue":"END",        "answer":"GENESIS", "hint":"The opposite of the end, at the beginning of time", "alternates":["BEGINNING","START","ORIGIN"]},
+        {"clue":"DUSK",       "answer":"DAWN",    "hint":"The opposite moment — when it all begins"},
+        {"clue":"FUTURE",     "answer":"PAST",    "hint":"Flip the direction of time"},
+    ],
+    # RED + GREEN = subtract using context clues
+    ("red","green","low"): [
+        {"clue":"WHAT A FOREST BECOMES WHEN STRIPPED", "answer":"STUMP",  "hint":"Remove the trees — what's left?", "alternates":["LOG","WOOD"]},
+        {"clue":"WHAT AN OCEAN BECOMES WITHOUT WATER",  "answer":"DESERT", "hint":"Remove the water — what remains?", "alternates":["SAND","BASIN"]},
+        {"clue":"WHAT A FIRE BECOMES WITHOUT FUEL",     "answer":"ASH",    "hint":"Subtract the flame", "alternates":["EMBER","SMOKE"]},
+        {"clue":"WHAT A STORM BECOMES AT ITS END",      "answer":"CALM",   "hint":"After the weather passes", "alternates":["STILL","PEACE","QUIET"]},
+        {"clue":"WHAT A RIVER BECOMES IN DROUGHT",      "answer":"BED",    "hint":"The channel without water", "alternates":["DITCH","CHANNEL"]},
+    ],
+    # BLUE + GREEN = amplify using context
+    ("blue","green","low"): [
+        {"clue":"WHAT A SPARK BECOMES IN A DRY FOREST",  "answer":"WILDFIRE","hint":"Context amplifies the danger", "alternates":["INFERNO","BLAZE"]},
+        {"clue":"WHAT A PUDDLE BECOMES AFTER A FLOOD",   "answer":"LAKE",    "hint":"Amplify the water in context", "alternates":["POND","RIVER"]},
+        {"clue":"WHAT A WHISPER BECOMES IN AN EMPTY HALL","answer":"ECHO",   "hint":"The space amplifies the sound"},
+        {"clue":"WHAT A SEED BECOMES IN RICH SOIL",      "answer":"TREE",    "hint":"Growth amplified by context", "alternates":["PLANT","FOREST"]},
+        {"clue":"WHAT A CRACK BECOMES IN AN EARTHQUAKE", "answer":"CHASM",   "hint":"Amplified by seismic force", "alternates":["CANYON","FAULT","RIFT"]},
+    ],
+    # BLACK + YELLOW = opposite + wordplay
+    ("black","yellow","mid"): [
+        {"clue":"ANAGRAM OF 'NIGHT' → ITS OPPOSITE",    "answer":"DAY",    "hint":"Unscramble THING, then find the opposite of dark"},
+        {"clue":"ANAGRAM OF 'EARTH' → ITS OPPOSITE",    "answer":"SKY",    "hint":"Unscramble HEART, then look up", "alternates":["SPACE","HEAVEN"]},
+        {"clue":"ANAGRAM OF 'BELOW' → ITS OPPOSITE",    "answer":"ABOVE",  "hint":"Unscramble ELBOW — then flip the direction"},
+        {"clue":"ANAGRAM OF 'STARE' → EMOTION OPPOSITE","answer":"CALM",   "hint":"Unscramble TEARS — then find its opposite", "alternates":["PEACE","JOY"]},
+        {"clue":"ANAGRAM OF 'SPARE' → OPPOSITE OF SAVE","answer":"SPEND",  "hint":"Unscramble REAPS — then flip the economy", "alternates":["WASTE","LOSE"]},
+    ],
+    # RED + BLACK + HIGH = phonetic subtraction of an opposite
+    ("red","black","high"): [
+        {"clue":"SOUNDS LIKE THE OPPOSITE OF 'NIGHT' BUT SMALLER", "answer":"DAY",   "hint":"The opposite of darkness — one syllable"},
+        {"clue":"SOUNDS LIKE THE OPPOSITE OF 'WAR' — SHORTER",     "answer":"PEACE", "hint":"Sounds like 'piece' — the simpler form of harmony"},
+        {"clue":"SOUNDS LIKE THE OPPOSITE OF 'LOVE' — ONE SOUND",  "answer":"HATE",  "hint":"Four letters, rhymes with 'late'"},
+        {"clue":"SOUNDS LIKE A LESSER FORM OF 'ANCIENT'",          "answer":"OLD",   "hint":"Simpler word for the opposite of new"},
+        {"clue":"SOUNDS LIKE THE OPPOSITE OF 'FULL' — SHORT",      "answer":"EMPTY", "hint":"Two syllables, sounds like 'em-tee'"},
+    ],
+    # BLUE + BROWN + HIGH = phonetic amplification over time
+    ("blue","brown","high"): [
+        {"clue":"SOUNDS LIKE WHAT A BOY BECOMES — AMPLIFIED",        "answer":"MAN",      "hint":"Grow up — sounds simple but means everything", "alternates":["ADULT"]},
+        {"clue":"SOUNDS LIKE WHAT 'NOW' BECOMES — SOUNDS LIKE 'FUTURE'","answer":"LATER",  "hint":"Time moves forward — sounds like 'lay-ter'"},
+        {"clue":"SOUNDS LIKE WHAT AN 'EMBER' GROWS INTO OVER TIME",  "answer":"INFERNO",  "hint":"Fire amplified — sounds like 'in-FER-no'", "alternates":["BLAZE","FIRE"]},
+        {"clue":"SOUNDS LIKE WHAT 'ATE' BECOMES WHEN TIME PASSES",   "answer":"EIGHT",    "hint":"The number that sounds like the past tense of eat"},
+        {"clue":"SOUNDS LIKE A GROWN VERSION OF 'CREEK'",            "answer":"RIVER",    "hint":"Larger waterway — sounds like 'RIV-er'"},
+    ],
+}
+
+# Descriptions for multi-tile combos
+MULTI_DESCRIPTIONS = {
+    ("red","black","mid"):   "Subtract AND reverse — find a lesser opposite",
+    ("blue","black","mid"):  "Amplify AND reverse — find a greater opposite",
+    ("red","brown","mid"):   "Subtract AND go back in time",
+    ("blue","brown","mid"):  "Amplify AND move forward in time",
+    ("red","yellow","mid"):  "Subtract AND unscramble — anagram of a lesser form",
+    ("blue","yellow","mid"): "Amplify AND unscramble — anagram of a greater form",
+    ("black","brown","mid"): "Reverse AND shift through time",
+    ("red","green","low"):   "Subtract using context clues",
+    ("blue","green","low"):  "Amplify using context clues",
+    ("black","yellow","mid"):"Reverse AND apply wordplay",
+    ("red","black","high"):  "Phonetic subtraction of an opposite",
+    ("blue","brown","high"): "Phonetic amplification over time",
+}
+
+# Tutorial multi-tile stages (13-18)
+MULTI_STAGES = [
+    {
+        "name": "Stage 13 — Subtract the Opposite",
+        "unlocks": {"colors": ["red","black"], "height": "mid"},
+        "intro": "🔴⬛ Red + Black: first find the OPPOSITE, then reduce it to a simpler or lesser form. Two rules, one answer.",
+        "puzzles": [
+            {"clue":"ANCIENT",     "answer":"MODERN",   "alternates":["CONTEMPORARY","NEW","RECENT"], "colors":["red","black"], "height":"mid","hint":"Opposite in time, then simplify"},
+            {"clue":"ENORMOUS",    "answer":"TINY",     "alternates":["SMALL","LITTLE"],              "colors":["red","black"], "height":"mid","hint":"Subtract the scale AND flip it"},
+            {"clue":"BLAZING",     "answer":"COOL",     "alternates":["COLD","CHILLY"],               "colors":["red","black"], "height":"mid","hint":"Less intense AND the opposite temperature"},
+            {"clue":"VICTORY",     "answer":"LOSS",     "alternates":["DEFEAT","FAIL"],               "colors":["red","black"], "height":"mid","hint":"Reduce the outcome AND flip it"},
+            {"clue":"THUNDERSTORM","answer":"CALM",     "alternates":["STILL","QUIET","PEACE"],       "colors":["red","black"], "height":"mid","hint":"Reduce the weather AND find its opposite"},
+        ],
+    },
+    {
+        "name": "Stage 14 — Amplify the Opposite",
+        "unlocks": {"colors": ["blue","black"], "height": "mid"},
+        "intro": "🔵⬛ Blue + Black: find the OPPOSITE and then INTENSIFY it. Push it further in the other direction.",
+        "puzzles": [
+            {"clue":"WARM",    "answer":"FREEZING","alternates":["FROZEN","ICY","FRIGID"],     "colors":["blue","black"],"height":"mid","hint":"Amplify AND flip the temperature"},
+            {"clue":"DISLIKE", "answer":"ADORE",   "alternates":["LOVE","WORSHIP"],            "colors":["blue","black"],"height":"mid","hint":"Find the opposite AND intensify it"},
+            {"clue":"WHISPER", "answer":"ROAR",    "alternates":["SCREAM","SHOUT","BELLOW"],   "colors":["blue","black"],"height":"mid","hint":"Amplify AND flip the sound"},
+            {"clue":"DRIZZLE", "answer":"BLIZZARD","alternates":[],                            "colors":["blue","black"],"height":"mid","hint":"Add intensity AND flip the warmth"},
+            {"clue":"JOY",     "answer":"AGONY",   "alternates":["MISERY","DESPAIR","GRIEF"],  "colors":["blue","black"],"height":"mid","hint":"Amplify AND reverse the emotion"},
+        ],
+    },
+    {
+        "name": "Stage 15 — Turn Back Time",
+        "unlocks": {"colors": ["red","brown"], "height": "mid"},
+        "intro": "🔴🟫 Red + Brown: go BACKWARDS in time and find a simpler or earlier form. Subtract through the timeline.",
+        "puzzles": [
+            {"clue":"SUMMER",     "answer":"SPRING",  "alternates":[],                    "colors":["red","brown"],"height":"mid","hint":"Go back one season AND reduce the warmth"},
+            {"clue":"ADULTHOOD",  "answer":"BIRTH",   "alternates":["INFANCY","BABY"],     "colors":["red","brown"],"height":"mid","hint":"Go back to the very beginning"},
+            {"clue":"MILLENNIUM", "answer":"DECADE",  "alternates":[],                    "colors":["red","brown"],"height":"mid","hint":"Go back in time AND reduce the scale"},
+            {"clue":"EVENING",    "answer":"DAWN",    "alternates":["MORNING","SUNRISE"],  "colors":["red","brown"],"height":"mid","hint":"Earlier in the day AND a simpler word"},
+            {"clue":"RIVER",      "answer":"SPRING",  "alternates":["SOURCE","CREEK"],     "colors":["red","brown"],"height":"mid","hint":"Reduce the water AND go to its source"},
+        ],
+    },
+    {
+        "name": "Stage 16 — Future Amplified",
+        "unlocks": {"colors": ["blue","brown"], "height": "mid"},
+        "intro": "🔵🟫 Blue + Brown: move FORWARD in time AND amplify. What does this become when it grows and time passes?",
+        "puzzles": [
+            {"clue":"MORNING",  "answer":"TOMORROW","alternates":[],                       "colors":["blue","brown"],"height":"mid","hint":"Later in time AND expand beyond today"},
+            {"clue":"SEED",     "answer":"FOREST",  "alternates":["TREE","WOODLAND"],      "colors":["blue","brown"],"height":"mid","hint":"Grow it AND let time pass"},
+            {"clue":"CHILD",    "answer":"ELDER",   "alternates":["ADULT","SENIOR","OLD"], "colors":["blue","brown"],"height":"mid","hint":"Age forward AND amplify"},
+            {"clue":"SPARK",    "answer":"INFERNO", "alternates":["FIRE","BLAZE"],         "colors":["blue","brown"],"height":"mid","hint":"Let time and fuel amplify the fire"},
+            {"clue":"CREEK",    "answer":"OCEAN",   "alternates":[],                       "colors":["blue","brown"],"height":"mid","hint":"Amplify the water AND let it flow over time"},
+        ],
+    },
+    {
+        "name": "Stage 17 — Context Subtracted",
+        "unlocks": {"colors": ["red","green"], "height": "low"},
+        "intro": "🔴🟢 Red + Green: use CONTEXT to understand the clue, then SUBTRACT — find what remains when something is taken away.",
+        "puzzles": [
+            {"clue":"WHAT A FOREST BECOMES WHEN STRIPPED",  "answer":"STUMP",  "alternates":["LOG","WOOD"],         "colors":["red","green"],"height":"low","hint":"Remove the trees — what's left?"},
+            {"clue":"WHAT AN OCEAN BECOMES WITHOUT WATER",  "answer":"DESERT", "alternates":["SAND","BASIN"],       "colors":["red","green"],"height":"low","hint":"Remove the water — what remains?"},
+            {"clue":"WHAT A FIRE BECOMES WITHOUT FUEL",     "answer":"ASH",    "alternates":["EMBER","SMOKE"],      "colors":["red","green"],"height":"low","hint":"Subtract the flame"},
+            {"clue":"WHAT A STORM BECOMES AT ITS END",      "answer":"CALM",   "alternates":["STILL","PEACE"],      "colors":["red","green"],"height":"low","hint":"After the weather passes"},
+            {"clue":"WHAT A RIVER BECOMES IN DROUGHT",      "answer":"BED",    "alternates":["DITCH","CHANNEL"],    "colors":["red","green"],"height":"low","hint":"The channel without water"},
+        ],
+    },
+    {
+        "name": "Stage 18 — Context Amplified",
+        "unlocks": {"colors": ["blue","green"], "height": "low"},
+        "intro": "🔵🟢 Blue + Green: use CONTEXT to understand the situation, then AMPLIFY — what does this become when it grows?",
+        "puzzles": [
+            {"clue":"WHAT A SPARK BECOMES IN A DRY FOREST",   "answer":"WILDFIRE","alternates":["INFERNO","BLAZE"],   "colors":["blue","green"],"height":"low","hint":"Context amplifies the danger"},
+            {"clue":"WHAT A PUDDLE BECOMES AFTER A FLOOD",    "answer":"LAKE",    "alternates":["POND","RIVER"],       "colors":["blue","green"],"height":"low","hint":"Amplify the water in context"},
+            {"clue":"WHAT A WHISPER BECOMES IN AN EMPTY HALL","answer":"ECHO",    "alternates":[],                    "colors":["blue","green"],"height":"low","hint":"The space amplifies the sound"},
+            {"clue":"WHAT A SEED BECOMES IN RICH SOIL",       "answer":"TREE",    "alternates":["PLANT","FOREST"],    "colors":["blue","green"],"height":"low","hint":"Growth amplified by context"},
+            {"clue":"WHAT A CRACK BECOMES IN AN EARTHQUAKE",  "answer":"CHASM",   "alternates":["CANYON","FAULT"],    "colors":["blue","green"],"height":"low","hint":"Amplified by seismic force"},
+        ],
+    },
+]
+
+def build_multi_puzzles():
+    ordered = []
+    base_stage = len(STAGES)
+    for stage_idx, stage in enumerate(MULTI_STAGES):
+        unlock = stage['unlocks']
+        normalized_unlock = {
+            "colors": unlock.get('colors', [unlock.get('color', 'red')]),
+            "height": unlock['height'],
+        }
+        for puzz_idx, p in enumerate(stage['puzzles']):
+            ordered.append({
+                **p,
+                "color": p['colors'][0],
+                "stage_index": base_stage + stage_idx,
+                "stage_name": stage['name'],
+                "is_first_in_stage": puzz_idx == 0,
+                "unlocks": normalized_unlock if puzz_idx == 0 else None,
+                "stage_intro": stage['intro'] if puzz_idx == 0 else None,
+                "is_multi": True,
+            })
+    return ordered
+
+ALL_MULTI_PUZZLES = build_multi_puzzles()
+ALL_PUZZLES = ALL_PUZZLES + ALL_MULTI_PUZZLES
+TOTAL_MULTI_STAGES = len(MULTI_STAGES)
+
 def _safe_puzzle(puzzle, index):
+    is_multi = puzzle.get('is_multi', False)
+    colors = puzzle.get('colors', [puzzle['color']])
+    if is_multi:
+        pts = sum(COLOR_POINTS.get(c, 100) for c in colors) + HEIGHT_BONUS.get(puzzle['height'], 0)
+    else:
+        pts = COLOR_POINTS.get(puzzle['color'], 100) + HEIGHT_BONUS.get(puzzle['height'], 0)
     return {
         "index": index,
         "clue": puzzle['clue'],
         "height": puzzle['height'],
         "color": puzzle['color'],
+        "colors": colors,
+        "is_multi": is_multi,
         "answer_length": len(puzzle['answer']),
-        "points_possible": COLOR_POINTS.get(puzzle['color'], 100) + HEIGHT_BONUS.get(puzzle['height'], 0),
+        "points_possible": pts,
         "stage_index": puzzle['stage_index'],
         "stage_name": puzzle['stage_name'],
     }
 
+# ─── MULTI-TILE TUTORIAL ROUTES ─────────────────────────────────────────────
+
+@app.route('/api/new_multi_game', methods=['POST'])
+def new_multi_game():
+    session['multi_current'] = 0
+    session['multi_score'] = 0
+    session['multi_results'] = []
+    first = ALL_MULTI_PUZZLES[0]
+    return jsonify({
+        "total": len(ALL_MULTI_PUZZLES),
+        "total_stages": TOTAL_MULTI_STAGES,
+        "puzzle": _safe_puzzle(first, 0),
+        "score": 0,
+        "stage_unlock": {
+            "colors": first['unlocks']['colors'],
+            "height": first['unlocks']['height'],
+            "stage_name": first['stage_name'],
+            "intro": first['stage_intro'],
+        }
+    })
+
+@app.route('/api/submit_multi', methods=['POST'])
+def submit_multi():
+    data = request.get_json()
+    answer = data.get('answer', '').strip().upper()
+    current = session.get('multi_current', 0)
+    score = session.get('multi_score', 0)
+    if current >= len(ALL_MULTI_PUZZLES):
+        return jsonify({"error": "Game over"}), 400
+    puzzle = ALL_MULTI_PUZZLES[current]
+    accepted = [puzzle['answer'].upper()] + [a.upper() for a in puzzle.get('alternates', [])]
+    is_correct = answer in accepted
+    correct_answer = puzzle['answer'].upper()
+    points_earned = 0
+    if is_correct:
+        points_earned = sum(COLOR_POINTS.get(c, 100) for c in puzzle.get('colors', [puzzle['color']])) + HEIGHT_BONUS.get(puzzle['height'], 0)
+        score += points_earned
+    session['multi_score'] = score
+    session['multi_results'] = session.get('multi_results', []) + [{"c": int(is_correct), "p": points_earned}]
+    result = {
+        "correct": is_correct,
+        "your_answer": answer,
+        "correct_answer": correct_answer,
+        "points_earned": points_earned,
+        "score": score,
+        "puzzle_index": current,
+    }
+    next_index = current + 1
+    session['multi_current'] = next_index
+    game_over = next_index >= len(ALL_MULTI_PUZZLES)
+    response = {**result, "game_over": game_over}
+    if not game_over:
+        next_p = ALL_MULTI_PUZZLES[next_index]
+        response["next_puzzle"] = _safe_puzzle(next_p, next_index)
+        response["puzzle_number"] = next_index + 1
+        response["total"] = len(ALL_MULTI_PUZZLES)
+        if next_p['is_first_in_stage']:
+            response["stage_unlock"] = {
+                "colors": next_p['unlocks']['colors'],
+                "height": next_p['unlocks']['height'],
+                "stage_name": next_p['stage_name'],
+                "intro": next_p['stage_intro'],
+            }
+    return jsonify(response)
+
+@app.route('/api/hint_multi', methods=['POST'])
+def get_hint_multi():
+    current = session.get('multi_current', 0)
+    if current < len(ALL_MULTI_PUZZLES):
+        return jsonify({"hint": ALL_MULTI_PUZZLES[current].get('hint', 'No hint available.')})
+    return jsonify({"hint": "No hint available."})
+
+# ─── MULTI-TILE SANDBOX ROUTES ───────────────────────────────────────────────
+
+@app.route('/api/sandbox/multi_combos', methods=['GET'])
+def sandbox_multi_combos():
+    combos = {}
+    for (c1, c2, h), puzzles in MULTI_BANK.items():
+        key = f"{c1}_{c2}_{h}"
+        combos[key] = {
+            "color1": c1, "color2": c2, "height": h,
+            "count": len(puzzles),
+            "description": MULTI_DESCRIPTIONS.get((c1, c2, h), ""),
+        }
+    return jsonify(combos)
+
+@app.route('/api/sandbox/multi_puzzle', methods=['POST'])
+def sandbox_multi_puzzle():
+    data = request.get_json()
+    c1 = data.get('color1','').lower()
+    c2 = data.get('color2','').lower()
+    h  = data.get('height','').lower()
+    key = (c1, c2, h)
+    pool = MULTI_BANK.get(key)
+    if not pool:
+        return jsonify({"error": f"No puzzles for {c1}/{c2}/{h}"}), 404
+    puzzle = random.choice(pool)
+    points = COLOR_POINTS.get(c1,100) + COLOR_POINTS.get(c2,100) + HEIGHT_BONUS.get(h,0)
+    return jsonify({
+        "clue": puzzle['clue'],
+        "color1": c1, "color2": c2, "height": h,
+        "answer_length": len(puzzle['answer']),
+        "points_possible": points,
+        "description": MULTI_DESCRIPTIONS.get(key, ""),
+        "hint": puzzle.get('hint',''),
+        "_answer": puzzle['answer'],
+        "_alternates": puzzle.get('alternates', []),
+    })
+
+@app.route('/api/sandbox/multi_submit', methods=['POST'])
+def sandbox_multi_submit():
+    data = request.get_json()
+    answer = data.get('answer','').strip().upper()
+    correct_answer = data.get('correct_answer','').upper()
+    alternates = [a.upper() for a in data.get('alternates',[])]
+    is_correct = answer in ([correct_answer] + alternates)
+    points_earned = 0
+    if is_correct:
+        c1 = data.get('color1','white')
+        c2 = data.get('color2','black')
+        h  = data.get('height','mid')
+        points_earned = COLOR_POINTS.get(c1,100) + COLOR_POINTS.get(c2,100) + HEIGHT_BONUS.get(h,0)
+    return jsonify({"correct": is_correct, "correct_answer": correct_answer, "points_earned": points_earned})
+
 if __name__ == '__main__':
+    import os
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
